@@ -5,6 +5,9 @@
 #include <iostream>
 #include <fstream>
 
+// TODO
+// 1. periodic boundaries
+// 2. incomplete chains
 
 const char species[6][10] = {"", "CH3", "CH2", "CH", "CH_aro", "C_aro"};
 // const char species[6][10] = {"", "C", "H", "B", "F", "N"};
@@ -46,20 +49,21 @@ struct unitedAtom
 	}
 };
 
-int nMonomers = 20;	// number of monomers in the simulation box, calculate using desired density
+int nMonomers = 10;	// number of monomers in the simulation box, calculate using desired density
 int nAtoms = 7*nMonomers + 1;
-double minDist = 1.4;
+double minDist = 2;
 int maxTrials = 100;
+vector3<> boxSize(40, 40, 40); 
 
 void printAtoms(unitedAtom*, int);
-vector3<> randomStep(double);
+vector3<> randomStep();
 bool checkCollision(unitedAtom*, int, int num = 1);
 void exportXYZ(unitedAtom *, int);
 void tetrahedral(vector3<>, vector3<>, vector3<>&, vector3<>&);
 bool addFirstHalf(unitedAtom *, int);
 bool addSecondHalf(unitedAtom *, int);
-
-// using namespace std;
+int initiate(unitedAtom *, int);
+int terminate(unitedAtom *, int);
 
 int main(int argc, char const *argv[])
 {
@@ -69,30 +73,19 @@ int main(int argc, char const *argv[])
 	int iAtom = 0;
 
 	// ============ Initiation ====================
-	// Step 1: start with CH3
-	// initiate(listAtoms, iAtom); iAtom+=2;
-	listAtoms[iAtom++] = unitedAtom(1, vector3<>(0,0,0));
-	// if can't find a spot, terminate the algorithm
-	// if(checkCollision(listAtoms, 0))
-	// 	listAtoms[0] = unitedAtom(0, vector3<>(0, 0, 0));
-
+	iAtom = initiate(listAtoms, iAtom);
 	
 	// ============ Propagation ====================
-	// Step 2: add CH
-	step = randomStep(bondLengths[0]);
-	newPos = listAtoms[iAtom-1].pos + step;
-	listAtoms[iAtom++] = unitedAtom(3, newPos);
-	// if can't find a spot, undo Step 1 and terminate the current chain
-
-	while(iAtom < nAtoms)
+	while(iAtom < nAtoms && iAtom > 0)
 	{
 		// Step 3: add C_aro and construct aromatic ring, using a random angle
 		if (!addSecondHalf(listAtoms, iAtom))
 		{
 			// if can't find a spot, undo Step 2 and 1, and terminate the current chain
-			// terminate(listAtoms, iAtom-1);
-			// initiate(listAtoms, iAtom); iAtom+=2;
-			// continue;
+			iAtom = terminate(listAtoms, iAtom);
+			iAtom = initiate(listAtoms, iAtom);
+			if (!iAtom) break;
+			continue;
 		}
 		else iAtom += 6;
 
@@ -100,20 +93,19 @@ int main(int argc, char const *argv[])
 		if (!addFirstHalf(listAtoms, iAtom))
 		{
 			// if can't find a spot, terminate the current chain
-			// terminate(listAtoms, iAtom-1);
-			// if (!initiate(listAtoms, iAtom)) break;
-			// else iAtom+=2;
+			iAtom = terminate(listAtoms, iAtom);
+			iAtom = initiate(listAtoms, iAtom);
 		}
 		else iAtom++;
 	}
 
 	// ============ Termination ====================
+	// find any incomplete chain, either remove them or complete them
 
 
 	// export to XYZ file
 	exportXYZ(listAtoms, nAtoms);
 	// export to LAMMPS data file
-
 
 	return 0;
 }
@@ -126,12 +118,11 @@ void printAtoms(unitedAtom *listAtoms, int n)
 	}
 }
 
-vector3<> randomStep(double size)
+vector3<> randomStep()
 {
 	vector3<> step;
 	step[0] = Random::uniform(); step[1] = Random::uniform(); step[2] = Random::uniform();
 	step = normalize(step);
-	step *= size;
 	return step;
 }
 
@@ -160,7 +151,7 @@ void exportXYZ(unitedAtom *listAtoms, int nAtoms)
 	fprintf(fp, "%d\n", nAtoms);
 	fprintf(fp, "POLYSTYRENE\n");
 	for (int i = 0; i < nAtoms; ++i)
-		fprintf(fp, "%d\t%lf\t%lf\t%lf\n", listAtoms[i].type, listAtoms[i].pos[0], listAtoms[i].pos[1], listAtoms[i].pos[2]);
+		fprintf(fp, "C\t%lf\t%lf\t%lf\n", listAtoms[i].type, listAtoms[i].pos[0], listAtoms[i].pos[1], listAtoms[i].pos[2]);
 	fclose(fp);
 }
 
@@ -232,6 +223,7 @@ bool addSecondHalf(unitedAtom *listAtoms, int start)
 			listAtoms[start+i+1].type = aromaticRing[i].type;
 			listAtoms[start+i+1].pos  = listAtoms[start].pos + aromaticRing[i].pos * localCoords;
 		}
+		// PBC_wrap(listAtoms, start, 6);
 
 		if (!checkCollision(listAtoms, start, 6)) break;
 		if (++iTrial == maxTrials) break;
@@ -259,6 +251,8 @@ bool addFirstHalf(unitedAtom *listAtoms, int start)
 		r8 = (prob > 0.5)? r8 : r9;
 
 		listAtoms[start] = unitedAtom(3, bondLengths[1]*r8+r1);
+		// PBC_wrap(listAtoms, start, 1);
+		
 		if (!checkCollision(listAtoms, start, 1)) break;
 		if (++iTrial == maxTrials) break;
 	}while(true);
@@ -268,7 +262,74 @@ bool addFirstHalf(unitedAtom *listAtoms, int start)
 	return true;
 }
 
-void terminate(int index)
+int initiate(unitedAtom *listAtoms, int index)
 {
+	int iTrial = 0;
+	vector3<> step, pos0;
 
+	do{
+		pos0 = vector3<>(
+			Random::uniform(0, boxSize[0]),
+			Random::uniform(0, boxSize[1]),
+			Random::uniform(0, boxSize[2]));
+		listAtoms[index] = unitedAtom(1, pos0);
+		step  = bondLengths[0] * randomStep();
+		step += pos0;
+		listAtoms[index+1] = unitedAtom(3, step);
+		// PBC_wrap(listAtoms, start, 2);
+
+		if (!checkCollision(listAtoms, index, 2))	break;
+		if (++iTrial == maxTrials) break;
+	}while(true);
+	if (iTrial) printf("Tried %d times to initiate at %d\n", iTrial, index);
+	if (iTrial == maxTrials) return 0;
+	else return (index+2);
 }
+
+int terminate(unitedAtom *listAtoms, int index)
+{
+	printf("Terminated!! at %d\n", index);
+	switch(listAtoms[index].type)
+	{
+		case 5:
+			for (int i = 0; i < 7; ++i)
+				listAtoms[index-1+i] = unitedAtom(0, vector3<>(0, 0, 0));
+
+			if (listAtoms[index-2].type == 1)
+			{
+				listAtoms[index-2] = unitedAtom(0, vector3<>(0, 0, 0));
+				return (index-2);
+			}
+			else
+			{
+				listAtoms[index-8].type = 2;
+				return (index-1);
+			}
+			break;
+		case 3:
+			listAtoms[index] = unitedAtom(0, vector3<>(0, 0, 0));
+			if (listAtoms[index-1].type == 1)
+			{
+				listAtoms[index-1] = unitedAtom(0, vector3<>(0, 0, 0));
+				return (index-1);
+			}
+			else
+			{
+				listAtoms[index-7].type = 2;
+				return index;
+			}
+			break;
+	}
+}
+
+// // void PBC_wrap(unitedAtom *listAtoms, int start, int count)
+// {
+// 	// vector3<> pos;
+// 	// for (int i = 0; i < count; ++i)
+// 	// {
+// 	// 	pos = listAtoms[start+i].pos;
+// 	// 	if (pos[0] < 0) pos[0] += boxSize[0];
+// 	// 	if (pos[1] < 0) pos[1] += boxSize[1];
+// 	// 	if (pos[2] < 0) pos[2] += boxSize[2];
+// 	// }
+// }
