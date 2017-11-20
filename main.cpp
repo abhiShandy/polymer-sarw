@@ -7,7 +7,6 @@
 
 // TODO
 // 1. periodic boundaries
-// 2. incomplete chains - use std-vector
 
 const char species[6][10] = {"", "CH3", "CH2", "CH", "CH_aro", "C_aro"};
 // const char species[6][10] = {"", "C", "H", "B", "F", "N"};
@@ -43,9 +42,8 @@ struct unitedAtom
 {
 	int type;
 	vector3<> pos;
-	unitedAtom(int type, vector3<> pos) : type(type), pos(pos)
-	{
-	}
+	unitedAtom() : type(0), pos(vector3<>(0,0,0)) {}
+	unitedAtom(int type, vector3<> pos) : type(type), pos(pos) {}
 };
 
 int nMonomers = 20;	// number of monomers in the simulation box, calculate using desired density
@@ -53,24 +51,23 @@ int nChains = 1;
 int nAtoms = 7*nMonomers + nChains;
 double minDist = 2;
 int maxTrials = 100;
-vector3<> boxSize(20, 20, 20); 
+vector3<> boxSize(20, 20, 20);
 
-void printAtoms(unitedAtom*, int);
 vector3<> randomStep();
-bool checkCollision(unitedAtom*, int, int num = 1);
-void exportXYZ(unitedAtom *, int);
+bool checkCollision(std::vector<unitedAtom>&, int, int num = 1);
+void exportXYZ(std::vector<unitedAtom>&, int);
 void tetrahedral(vector3<>, vector3<>, vector3<>&, vector3<>&);
-bool addFirstHalf(unitedAtom *, int);
-bool addSecondHalf(unitedAtom *, int);
-int initiate(unitedAtom *, int);
-int terminate(unitedAtom *, int);
+bool addFirstHalf(std::vector<unitedAtom>&, int);
+bool addSecondHalf(std::vector<unitedAtom>&, int);
+int initiate(std::vector<unitedAtom>&, int);
+int terminate(std::vector<unitedAtom>&, int);
 
 int main(int argc, char const *argv[])
 {
 	printf("Self Avoiding Random Walk\n");
-	unitedAtom *listAtoms = (unitedAtom*) malloc(nAtoms * sizeof(unitedAtom));
+	std::vector<unitedAtom> listAtoms(nAtoms, unitedAtom());
 	vector3<> step, newPos;
-	int iAtom = 0;
+	int iAtom = 0, iMonomer = 0;
 
 	// ============ Initiation ====================
 	iAtom = initiate(listAtoms, iAtom);
@@ -87,7 +84,12 @@ int main(int argc, char const *argv[])
 			if (!iAtom) break;
 			continue;
 		}
-		else iAtom += 6;
+		else
+		{
+			iAtom += 6;
+			iMonomer++;
+			if (iMonomer == nMonomers) break;
+		}
 
 		// Step 4: add CH from last CH
 		if (!addFirstHalf(listAtoms, iAtom))
@@ -99,40 +101,29 @@ int main(int argc, char const *argv[])
 		else iAtom++;
 	}
 
-	// ============ Termination ====================
-	// find any incomplete chain, either remove them or complete them
-
-
 	// export to XYZ file
 	exportXYZ(listAtoms, nAtoms);
 	// export to LAMMPS data file
 
-	return 0;
-}
+	printf("nChains : %d\n", nChains);
 
-void printAtoms(unitedAtom *listAtoms, int n)
-{
-	for (int i = 0; i < n; ++i)
-	{
-		printf("%d %d %.2f %.2f %.2f\n", i+1, listAtoms[i].type, listAtoms[i].pos[0], listAtoms[i].pos[1], listAtoms[i].pos[2]);
-	}
+	return 0;
 }
 
 vector3<> randomStep()
 {
-	vector3<> step;
-	step[0] = Random::uniform(); step[1] = Random::uniform(); step[2] = Random::uniform();
+	vector3<> step(Random::uniform(), Random::uniform(), Random::uniform());
 	step = normalize(step);
 	return step;
 }
 
-bool checkCollision(unitedAtom *listAtoms, int start, int num)
+bool checkCollision(std::vector<unitedAtom> &listAtoms, int index, int num)
 {
 	bool flag = false;
-	int iMax = start + num - 8;
+	int iMax = index + num - 8;
 	for (int i = 0; i < iMax; ++i)
 	{
-		for (int j = start; j < start+num; ++j)
+		for (int j = index; j < index+num; ++j)
 		{
 			double dist = (listAtoms[i].pos - listAtoms[j].pos).length();
 			if (dist < minDist)
@@ -146,7 +137,7 @@ bool checkCollision(unitedAtom *listAtoms, int start, int num)
 	return flag;
 }
 
-void exportXYZ(unitedAtom *listAtoms, int nAtoms)
+void exportXYZ(std::vector<unitedAtom> &listAtoms, int nAtoms)
 {
 	FILE* fp = fopen("polymer.xyz", "w");
 	fprintf(fp, "%d\n", nAtoms);
@@ -176,16 +167,29 @@ void tetrahedral(vector3<> a, vector3<> b, vector3<> &c, vector3<> &d)
 }
 
 // C_aro and 5 CH_aro to form the aromatic ring
-bool addSecondHalf(unitedAtom *listAtoms, int start)
+bool addSecondHalf(std::vector<unitedAtom> &listAtoms, int index)
 {
-	double theta, phi, d, dx, dz;
+	double theta, phi;
 	vector3<> localX, localY, localZ, newPos, r12, r10;
 	matrix3<> localCoords;
 	int iTrial = 0;
+
+	// ========= Aromatic Ring =============
+	std::vector<unitedAtom> aromaticRing(5, unitedAtom());
+
+	double d  = bondLengths[3];
+	double dz = d * cos(M_PI/3);
+	double dx = d * sin(M_PI/3);
+
+	aromaticRing[0] = unitedAtom(4, vector3<>(-dx, 0,   dz));
+	aromaticRing[1] = unitedAtom(4, vector3<>(-dx, 0,   dz + d));
+	aromaticRing[2] = unitedAtom(4, vector3<>(  0, 0, 2*dz + d));
+	aromaticRing[3] = unitedAtom(4, vector3<>( dx, 0,   dz + d));
+	aromaticRing[4] = unitedAtom(4, vector3<>( dx, 0,   dz));
 	
-	int next_nearest_CH = start==2? start-2 : start-8;
+	int next_nearest_CH = index==2? index-2 : index-8;
 	phi = 180-109.5;
-	localZ = normalize(listAtoms[start-1].pos - listAtoms[next_nearest_CH].pos);
+	localZ = normalize(listAtoms[index-1].pos - listAtoms[next_nearest_CH].pos);
 	if (abs(localZ[0]) > 0)
 		localX = vector3<>(1,0,0) - localZ * localZ.x();
 	else
@@ -193,57 +197,46 @@ bool addSecondHalf(unitedAtom *listAtoms, int start)
 	localX = normalize(localX);
 	localY = normalize(cross(localZ, localX));
 	
-	unitedAtom *aromaticRing = (unitedAtom*)malloc(5 * sizeof(unitedAtom));
-
-	d  = bondLengths[3];
-	dz = d * cos(M_PI/3);
-	dx = d * sin(M_PI/3);
-
-	aromaticRing[0] = unitedAtom(4, vector3<>(-dx, 0,   dz));
-	aromaticRing[1] = unitedAtom(4, vector3<>(-dx, 0,   dz + d));
-	aromaticRing[2] = unitedAtom(4, vector3<>(  0, 0, 2*dz + d));
-	aromaticRing[3] = unitedAtom(4, vector3<>( dx, 0,   dz + d));
-	aromaticRing[4] = unitedAtom(4, vector3<>( dx, 0,   dz));
-
 	do{
 		theta = Random::uniform(0, 359);
 		newPos = bondLengths[2]*sin(phi*M_PI/180)*cos(theta*M_PI/180)*localX
 		       + bondLengths[2]*sin(phi*M_PI/180)*sin(theta*M_PI/180)*localY
 			   + bondLengths[2]*cos(phi*M_PI/180)		   			 *localZ;
-		newPos += listAtoms[start-1].pos;
-		listAtoms[start] = unitedAtom(5, newPos);
+		newPos += listAtoms[index-1].pos;
+		listAtoms[index] = unitedAtom(5, newPos);
 
-		r12 = normalize(listAtoms[start].pos-listAtoms[start-1].pos);
-		r10 = normalize(listAtoms[next_nearest_CH].pos-listAtoms[start-1].pos);
+		r12 = normalize(listAtoms[index].pos-listAtoms[index-1].pos);
+		r10 = normalize(listAtoms[next_nearest_CH].pos-listAtoms[index-1].pos);
 		localCoords.set_row(2, r12);
 		localCoords.set_row(0, normalize(r10 - r12*dot(r10, r12)));
 		localCoords.set_row(1, normalize(cross(localCoords.row(2), localCoords.row(0))));
 
 		for (int i = 0; i < 5; ++i)
 		{
-			listAtoms[start+i+1].type = aromaticRing[i].type;
-			listAtoms[start+i+1].pos  = listAtoms[start].pos + aromaticRing[i].pos * localCoords;
+			listAtoms[index+i+1] = unitedAtom(aromaticRing[i].type,
+				listAtoms[index].pos + aromaticRing[i].pos * localCoords);
 		}
-		// PBC_wrap(listAtoms, start, 6);
+		// PBC_wrap(listAtoms, index, 6);
 
-		if (!checkCollision(listAtoms, start, 6)) break;
+		if (!checkCollision(listAtoms, index, 6)) break;
 		if (++iTrial == maxTrials) break;
 	}while(true);
-	if (iTrial) printf("Tried %d times for ring at %d\n", iTrial, start);
+
+	if (iTrial) printf("Tried %d times for ring at %d\n", iTrial, index);
 	if (iTrial == maxTrials) return false;
 	return true;
 }
 
 // CH
-bool addFirstHalf(unitedAtom *listAtoms, int start)
+bool addFirstHalf(std::vector<unitedAtom> &listAtoms, int index)
 {
 	vector3<> r1, r12, r10, r8, r9;
 	double prob;
 	int iTrial = 0;
 	
-	r12 = listAtoms[start-6].pos-listAtoms[start-7].pos;
-	r10 = listAtoms[start-8].pos-listAtoms[start-7].pos;
-	r1  = listAtoms[start-7].pos;
+	r12 = listAtoms[index-6].pos-listAtoms[index-7].pos;
+	r10 = listAtoms[index-8].pos-listAtoms[index-7].pos;
+	r1  = listAtoms[index-7].pos;
 
 	tetrahedral(r12, r10, r8, r9);
 
@@ -251,19 +244,19 @@ bool addFirstHalf(unitedAtom *listAtoms, int start)
 		prob = Random::uniform();
 		r8 = (prob > 0.5)? r8 : r9;
 
-		listAtoms[start] = unitedAtom(3, bondLengths[1]*r8+r1);
-		// PBC_wrap(listAtoms, start, 1);
+		listAtoms[index] = unitedAtom(3, bondLengths[1]*r8+r1);
+		// PBC_wrap(listAtoms, index, 1);
 		
-		if (!checkCollision(listAtoms, start, 1)) break;
+		if (!checkCollision(listAtoms, index, 1)) break;
 		if (++iTrial == maxTrials) break;
 	}while(true);
 
-	if (iTrial) printf("Tried %d times for CH at %d\n", iTrial, start);
+	if (iTrial) printf("Tried %d times for CH at %d\n", iTrial, index);
 	if (iTrial == maxTrials) return false;
 	return true;
 }
 
-int initiate(unitedAtom *listAtoms, int index)
+int initiate(std::vector<unitedAtom> &listAtoms, int index)
 {
 	int iTrial = 0;
 	vector3<> step, pos0;
@@ -273,11 +266,12 @@ int initiate(unitedAtom *listAtoms, int index)
 			Random::uniform(0, boxSize[0]),
 			Random::uniform(0, boxSize[1]),
 			Random::uniform(0, boxSize[2]));
-		listAtoms[index] = unitedAtom(1, pos0);
-		step  = bondLengths[0] * randomStep();
-		step += pos0;
-		listAtoms[index+1] = unitedAtom(3, step);
-		// PBC_wrap(listAtoms, start, 2);
+
+		step = bondLengths[0] * randomStep();
+
+		listAtoms[index]   = unitedAtom(1, pos0);
+		listAtoms[index+1] = unitedAtom(3, pos0 + step);
+		// PBC_wrap(listAtoms, index, 2);
 
 		if (!checkCollision(listAtoms, index, 2))	break;
 		if (++iTrial == maxTrials) break;
@@ -287,19 +281,22 @@ int initiate(unitedAtom *listAtoms, int index)
 	else return (index+2);
 }
 
-int terminate(unitedAtom *listAtoms, int index)
+int terminate(std::vector<unitedAtom> &listAtoms, int index)
 {
 	nChains++;
+	nAtoms++;
+	listAtoms.resize(nAtoms);
+
 	printf("Terminated!! at %d\n", index);
 	switch(listAtoms[index].type)
 	{
 		case 5:
 			for (int i = 0; i < 7; ++i)
-				listAtoms[index-1+i] = unitedAtom(0, vector3<>(0, 0, 0));
+				listAtoms[index-1+i] = unitedAtom();
 
 			if (listAtoms[index-2].type == 1)
 			{
-				listAtoms[index-2] = unitedAtom(0, vector3<>(0, 0, 0));
+				listAtoms[index-2] = unitedAtom();
 				return (index-2);
 			}
 			else
@@ -309,10 +306,10 @@ int terminate(unitedAtom *listAtoms, int index)
 			}
 			break;
 		case 3:
-			listAtoms[index] = unitedAtom(0, vector3<>(0, 0, 0));
+			listAtoms[index] = unitedAtom();
 			if (listAtoms[index-1].type == 1)
 			{
-				listAtoms[index-1] = unitedAtom(0, vector3<>(0, 0, 0));
+				listAtoms[index-1] = unitedAtom();
 				return (index-1);
 			}
 			else
@@ -324,12 +321,12 @@ int terminate(unitedAtom *listAtoms, int index)
 	}
 }
 
-// // void PBC_wrap(unitedAtom *listAtoms, int start, int count)
+// void PBC_wrap(std::vector<unitedAtom> &listAtoms, int index, int count)
 // {
 // 	// vector3<> pos;
 // 	// for (int i = 0; i < count; ++i)
 // 	// {
-// 	// 	pos = listAtoms[start+i].pos;
+// 	// 	pos = listAtoms[index+i].pos;
 // 	// 	if (pos[0] < 0) pos[0] += boxSize[0];
 // 	// 	if (pos[1] < 0) pos[1] += boxSize[1];
 // 	// 	if (pos[2] < 0) pos[2] += boxSize[2];
