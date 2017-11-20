@@ -7,7 +7,7 @@
 
 // TODO
 // 1. periodic boundaries
-// 2. incomplete chains
+// 2. incomplete chains - use std-vector
 
 const char species[6][10] = {"", "CH3", "CH2", "CH", "CH_aro", "C_aro"};
 // const char species[6][10] = {"", "C", "H", "B", "F", "N"};
@@ -18,7 +18,6 @@ const char species[6][10] = {"", "CH3", "CH2", "CH", "CH_aro", "C_aro"};
 // 		2, //CH2
 // 		3, //CH
 // 		4, //CH_aro
-// 		5, //C_aro
 // 	};
 
 const double bondLengths[] =
@@ -49,11 +48,12 @@ struct unitedAtom
 	}
 };
 
-int nMonomers = 10;	// number of monomers in the simulation box, calculate using desired density
-int nAtoms = 7*nMonomers + 1;
+int nMonomers = 20;	// number of monomers in the simulation box, calculate using desired density
+int nChains = 1;
+int nAtoms = 7*nMonomers + nChains;
 double minDist = 2;
 int maxTrials = 100;
-vector3<> boxSize(40, 40, 40); 
+vector3<> boxSize(20, 20, 20); 
 
 void printAtoms(unitedAtom*, int);
 vector3<> randomStep();
@@ -129,7 +129,8 @@ vector3<> randomStep()
 bool checkCollision(unitedAtom *listAtoms, int start, int num)
 {
 	bool flag = false;
-	for (int i = 0; i < start-1; ++i)
+	int iMax = start + num - 8;
+	for (int i = 0; i < iMax; ++i)
 	{
 		for (int j = start; j < start+num; ++j)
 		{
@@ -228,7 +229,7 @@ bool addSecondHalf(unitedAtom *listAtoms, int start)
 		if (!checkCollision(listAtoms, start, 6)) break;
 		if (++iTrial == maxTrials) break;
 	}while(true);
-	// if (iTrial) printf("Tried %d times for ring at %d\n", iTrial, start);
+	if (iTrial) printf("Tried %d times for ring at %d\n", iTrial, start);
 	if (iTrial == maxTrials) return false;
 	return true;
 }
@@ -257,7 +258,7 @@ bool addFirstHalf(unitedAtom *listAtoms, int start)
 		if (++iTrial == maxTrials) break;
 	}while(true);
 
-	// if (iTrial) printf("Tried %d times for CH at %d\n", iTrial, start);
+	if (iTrial) printf("Tried %d times for CH at %d\n", iTrial, start);
 	if (iTrial == maxTrials) return false;
 	return true;
 }
@@ -288,6 +289,7 @@ int initiate(unitedAtom *listAtoms, int index)
 
 int terminate(unitedAtom *listAtoms, int index)
 {
+	nChains++;
 	printf("Terminated!! at %d\n", index);
 	switch(listAtoms[index].type)
 	{
