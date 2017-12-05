@@ -1,5 +1,12 @@
 /*
 *	Developed by Abhishek Shandilya
+*	TODO
+	1. periodic box
+	2. book-keeping bonds
+	3. adding CH2 after the side-branch
+	4. break 2nd half into smaller modules
+	5. use parameter file
+	6. attain practical polymer density
 */
 
 
@@ -10,6 +17,7 @@
 #include "LatticeUtils.h"
 #include <iostream>
 #include <fstream>
+#include "main.h"
 
 const char species[6][10] = {"", "CH3", "CH2", "CH", "CH_aro", "C_aro"};
 
@@ -17,7 +25,7 @@ const double bondLengths[] =
 	{
 		1.54,	//CH3 	 - CH2 		or CH2 - CH
 		1.51,	//CH 	 - C_aro
-		1.40	//CH_aro - CH_aro
+		0.10	//CH_aro - CH_aro
 	};
 
 const double bondAngles[] =
@@ -74,24 +82,16 @@ struct Dihedral
 	}
 };
 
-const int nMonomers = 50;	// number of monomers in the simulation box, calculate using desired density
-#define POLYSTYRENE
-// #define POLYPROPYLENE
-std::vector<int> chainLengths;
-
 // std::vector<Bond> listBonds;
 // std::vector<Angle> listAngles;
 // std::vector<Dihedral> listDihedrals(nAtoms, Dihedral());
 // std::vector<Dihedral> listImpropers(nAtoms, Dihedral());
-
-const double minDist = 2;
-const int maxTrials = 100;
-const vector3<> boxSize(10, 10, 10);
+int boxSize = 10;
 
 // helper functions
 vector3<> randomUnitStep();
 void tetrahedral(const vector3<>, const vector3<>, vector3<>&, vector3<>&);
-vector3<> wrapPBC(vector3<>);
+vector3<> wrapPBC(const vector3<>);
 vector3<> randomConePos(const std::vector<unitedAtom>, const int, const int, const double);
 
 bool checkCollision(const std::vector<unitedAtom>, const std::vector<unitedAtom>, const bool flag = false);
@@ -99,8 +99,8 @@ bool checkCollision(const std::vector<unitedAtom>, const std::vector<unitedAtom>
 // export functions
 void exportXYZ(const std::vector<unitedAtom>);
 void exportXSF(const std::vector<unitedAtom>);
-// void exportLAMMPS(const std::vector<unitedAtom>&);
-void exportChainLengths();
+void exportLAMMPS(const std::vector<unitedAtom>);
+void exportChainLengths(const std::vector<unitedAtom>);
 
 // chain operations
 bool initiateChain(std::vector<unitedAtom>&);
@@ -136,9 +136,9 @@ int main(int argc, char *argv[])
 	exportXYZ(polymerChains);
 	exportXSF(polymerChains);
 	// export to LAMMPS data file
-	// exportLAMMPS(polymerChains);
+	exportLAMMPS(polymerChains);
 
-	exportChainLengths();
+	exportChainLengths(polymerChains);
 
 	return 0;
 }
@@ -164,6 +164,9 @@ void initialise(std::vector<unitedAtom> &sideBranch)
 	#ifdef POLYPROPYLENE
 	sideBranch.push_back( unitedAtom(1, vector3<>(  0, 0,    0)) );
 	#endif
+
+	boxSize = nearbyint(pow(nMonomers*(sideBranch.size()+2)/density, 0.3333));
+	printf("BoxSize = %d\n", boxSize);
 }
 
 vector3<> randomUnitStep()
@@ -189,13 +192,15 @@ void tetrahedral(const vector3<> a, const vector3<> b, vector3<> &c, vector3<> &
 	d = rot_mat * b;
 }
 
-vector3<> wrapPBC(vector3<> pos)
+vector3<> wrapPBC(const vector3<> pos)
 {
+	vector3<> wrappedPos = pos;
 	for (int i = 0; i < 3; ++i)
 	{
-		if 		(pos[i] < 0) 		  pos[i] += boxSize[i];
-		else if (pos[i] > boxSize[i]) pos[i] -= boxSize[i];
+		if 		(pos[i] < 0) 	   wrappedPos[i] += boxSize;
+		else if (pos[i] > boxSize) wrappedPos[i] -= boxSize;
 	}
+	return wrappedPos;
 }
 
 vector3<> randomConePos(const std::vector<unitedAtom> polymerChains, const int a, const int b, const double distance)
@@ -248,8 +253,11 @@ bool checkCollision(
 	{
 		for (int j = 0; j < newChainSize; ++j)
 		{
-			double dist = ((polymerChains[i].pos) - (chainLinks[j].pos)).length();
-			if (dist < minDist)
+			vector3<> dist = (polymerChains[i].pos - chainLinks[j].pos);
+			dist[0] -= boxSize * nearbyint(dist[0] / boxSize);
+			dist[1] -= boxSize * nearbyint(dist[1] / boxSize);
+			dist[2] -= boxSize * nearbyint(dist[2] / boxSize);
+			if (dist.length() < minDist)
 			{
 				flag = true;
 				break;
@@ -263,6 +271,7 @@ bool checkCollision(
 void exportXYZ(const std::vector<unitedAtom> polymerChains)
 {
 	FILE* fp = fopen("polymer.xyz", "w");
+	printf("nAtoms = %d\n", polymerChains.size());
 	fprintf(fp, "%d\n", polymerChains.size());
 	fprintf(fp, "POLYSTYRENE\n");
 	for (unitedAtom atom : polymerChains)
@@ -274,10 +283,10 @@ void exportXSF(const std::vector<unitedAtom> polymerChains)
 {
 	FILE* fp = fopen("polymer.xsf", "w");
 	fprintf(fp, "CRYSTAL\nPRIMVEC\n");
-	fprintf(fp, "%lf\t0.0\t0.0\n0.0\t%lf\t0.0\n0.0\t0.0\t%lf\n", boxSize[0], boxSize[1], boxSize[2]);
+	fprintf(fp, "%d.0\t0.0\t0.0\n0.0\t%d.0\t0.0\n0.0\t0.0\t%d.0\n", boxSize, boxSize, boxSize);
 
 	fprintf(fp, "CONVVEC\n");
-	fprintf(fp, "%lf\t0.0\t0.0\n0.0\t%lf\t0.0\n0.0\t0.0\t%lf\n", boxSize[0], boxSize[1], boxSize[2]);
+	fprintf(fp, "%d.0\t0.0\t0.0\n0.0\t%d.0\t0.0\n0.0\t0.0\t%d.0\n", boxSize, boxSize, boxSize);
 
 	fprintf(fp, "PRIMCOORD\n%d\t%d\n", polymerChains.size(), 1);
 	for (unitedAtom atom : polymerChains)
@@ -285,11 +294,110 @@ void exportXSF(const std::vector<unitedAtom> polymerChains)
 	fclose(fp);
 }
 
-void exportChainLengths()
+void exportLAMMPS(const std::vector<unitedAtom> polymerChains)
+{
+	// int nBonds = listBonds.size();
+	// int nAngles = listAngles.size();
+
+	FILE* fp = fopen("polymer.data", "w");
+	fprintf(fp, "POLYSTYRENE CHAINS\n\n");
+
+	fprintf(fp, "%d\tatoms\n", polymerChains.size());
+	// fprintf(fp, "%d\tbonds\n", nBonds);
+	// fprintf(fp, "%d\tangles\n", nAngles);
+	// fprintf(fp, "%d\tdihedrals\n", nDihedrals);
+	// fprintf(fp, "%d\timpropers\n", nImpropers);
+	fprintf(fp, "\n");
+	fprintf(fp, "5\tatom types\n");
+	fprintf(fp, "3\tbond types\n");
+	fprintf(fp, "5\tangle types\n");
+	fprintf(fp, "1\tdihedral types\n");
+	fprintf(fp, "1\timproper types\n");
+	fprintf(fp, "\n");
+	fprintf(fp, "%lf\t%lf\txlo\txhi\n", -0.5, 0.5);
+	fprintf(fp, "%lf\t%lf\tylo\tyhi\n", -0.5, 0.5);
+	fprintf(fp, "%lf\t%lf\tzlo\tzhi\n", -0.5, 0.5);
+	fprintf(fp, "\n");
+
+	fprintf(fp, "Masses\n");
+	for (int i=0;i<5;i++) fprintf(fp, "%d\t%lf\n", i+1, atomMass[i]);
+	fprintf(fp, "\n");
+	// ========= Coefficients ==============
+
+	// ========= Atoms ==============
+	fprintf(fp, "Atoms\n");
+	int i = 0;
+	for (unitedAtom ua : polymerChains)
+		fprintf(fp, "%d\t%d\t%lf\t%lf\t%lf\n", ++i, ua.type, ua.pos[0], ua.pos[1], ua.pos[2]);
+	fprintf(fp, "\n");
+
+	fprintf(fp, "Bonds\n");
+	// for (int i = 0; i < polymerChains.size()-1; i++)
+	// {
+		// currentType = polymerChains[i].type;
+		// nextType = polymerChains[i+1].type;
+		// fprintf(fp, "%d\t%d", i+1, listBonds[i].type);
+		// for (int j = 0; j < 2; ++j)	fprintf(fp, "\t%d", listBonds[i].species[j]);
+		// fprintf(fp, "\n");
+	// }
+	// i = 0;
+	// for(Bond b : listBonds)
+	// 	fprintf(fp, "%d\t%d\t%d\t%d\n", ++i, b.type, b.ua[0], b.ua[1]);
+	// fprintf(fp, "\n");
+	
+	// fprintf(fp, "Angles\n");
+	// for (int i = 0; i < nAngles; i++)
+	// {
+	// 	fprintf(fp, "%d\t%d", i+1, listAngles[i].type);
+	// 	for (int j = 0; j < 3; ++j)	fprintf(fp, "\t%d", listAngles[i].species[j]);
+	// 	fprintf(fp, "\n");
+	// }
+	// fprintf(fp, "\n");
+	
+	// fprintf(fp, "Dihedrals\n");
+	// for (int i = 0; i < nDihedrals; i++)
+	// {
+	// 	fprintf(fp, "%d\t%d\t", i+1, listDihedrals[i].type);
+	// 	for (int j = 0; j < 4; ++j)	fprintf(fp, "%d\t", listDihedrals[i].species[j]);
+	// 	fprintf(fp, "\n");
+	// }
+	// fprintf(fp, "\n");
+	
+	// fprintf(fp, "Impropers\n");
+	// for (int i = 0; i < nImpropers; i++)
+	// {
+	// 	fprintf(fp, "%d\t%d\t", i+1, listImpropers[i].type);
+	// 	for (int j = 0; j < 4; ++j)	fprintf(fp, "%d\t", listImpropers[i].species[j]);
+	// 	fprintf(fp, "\n");
+	// }
+	// fprintf(fp, "\n");
+	fclose(fp);
+}
+
+void exportChainLengths(const std::vector<unitedAtom> polymerChains)
 {
 	FILE* fp = fopen("chains.data", "w");
-	for(int i=chainLengths.size()-1; i>0; i--) chainLengths[i] -= chainLengths[i-1];
-	for(int i : chainLengths) fprintf(fp, "%d\n", i/8);
+	int iAtom = 0, actual_nMonomers = 0;
+	std::vector<int> chainLengths;
+	
+	for(unitedAtom i : polymerChains)
+	{
+		iAtom++;
+		// this won't work for poly-propylene
+		if (i.type == 1) chainLengths.push_back(iAtom);
+		if (i.type == 5) actual_nMonomers++;
+	}
+	printf("nChains = %d\n", chainLengths.size());
+	printf("Desired nMonomers = %d\n", nMonomers);
+	printf("Actual nMonomers = %d\n", actual_nMonomers);
+	printf("Desired number density = %.2f\n", density);
+	printf("Actual mass density = %.2f\n", (104 * actual_nMonomers)/pow(boxSize, 3));
+
+	for (int i = 0; i < chainLengths.size()-1; ++i)
+		chainLengths[i] = (chainLengths[i+1] - chainLengths[i])/8;
+	chainLengths[chainLengths.size()-1] = (polymerChains.size()+1 - chainLengths.back())/8;
+
+	for(int i : chainLengths) fprintf(fp, "%d\n", i);
 	fclose(fp);
 }
 
@@ -423,26 +531,39 @@ bool initiateChain(std::vector<unitedAtom> &polymerChains)
 {
 	vector3<> step, pos0;
 	std::vector<unitedAtom> newChainLinks(2, unitedAtom());
-
-	int iTrial = 0;
-	while(iTrial++ < maxTrials)
-	{
-		pos0 = vector3<>(
-			Random::uniform(0, boxSize[0]),
-			Random::uniform(0, boxSize[1]),
-			Random::uniform(0, boxSize[2]));
-
-		step = bondLengths[0] * randomUnitStep();
-
-		newChainLinks[0] = unitedAtom(1, pos0);
-		newChainLinks[1] = unitedAtom(3, pos0 + step);
-
-		if (checkCollision(polymerChains, newChainLinks, true)) continue;
-		polymerChains.push_back(newChainLinks[0]);
-		polymerChains.push_back(newChainLinks[1]);
-		break;
+	if(polymerChains.size()==0)
+	{	
+		// vector3<> CH3_pos(0,0,0);
+		vector3<> CH3_pos (0.5 * boxSize * vector3<>(1,1,1));
+		vector3<> CH_pos ( CH3_pos + normalize(vector3<>(1,1,1)) * bondLengths[0] );
+		polymerChains.push_back( unitedAtom(1, CH3_pos) );
+		polymerChains.push_back( unitedAtom(3,  CH_pos));
 	}
-	if (iTrial >= maxTrials) return false;
+
+	else
+	{
+
+		int iTrial = 0;
+		while(iTrial++ < maxTrials)
+		{
+			pos0 = vector3<>(
+				Random::uniform(0, boxSize),
+				Random::uniform(0, boxSize),
+				Random::uniform(0, boxSize));
+
+
+			step = bondLengths[0] * randomUnitStep();
+
+			newChainLinks[0] = unitedAtom(1, pos0);
+			newChainLinks[1] = unitedAtom(3, pos0 + step);
+
+			if (checkCollision(polymerChains, newChainLinks, true)) continue;
+			polymerChains.push_back(newChainLinks[0]);
+			polymerChains.push_back(newChainLinks[1]);
+			break;
+		}
+		if (iTrial >= maxTrials) return false;
+	}
 
 	// listBonds.push_back(Bond(1, index+1, index+2));
 	return true;
@@ -451,10 +572,8 @@ bool initiateChain(std::vector<unitedAtom> &polymerChains)
 void terminateChain(std::vector<unitedAtom> &polymerChains)
 {
 	int chainSize = polymerChains.size();
-	int nChains = 1;
 
-	printf("Terminated!! at %d\n", chainSize);
-	chainLengths.push_back(chainSize);
+	// printf("Terminated!! at %d\n", chainSize);
 	switch(polymerChains[chainSize-1].type)
 	{
 		case 1:	// can't add CH
