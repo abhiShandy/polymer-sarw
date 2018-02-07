@@ -278,7 +278,7 @@ bool checkCollision(
 	
 	for (int i = 0; i < chainSize; ++i)
 	{
-		if (ignoreIndex > 0 && i==ignoreIndex) continue;
+		if (ignoreIndex >= 0 && i==ignoreIndex) continue;
 		for (int j = 0; j < newChainSize; ++j)
 		{
 			vector3<> dist = (polymerChains[i].pos - newChainLinks[j].pos);
@@ -565,14 +565,15 @@ bool propagateChain(std::vector<unitedAtom> &polymerChains, std::vector<int> &la
 	if (DEBUG) printf("DEBUG:: Entered Propagation step\n");
 	// propagate all chains, if possible
 	// udpate indices and lengths
-	int lastIndex, penultimateIndex;
+	int iChain, lastIndex, penultimateIndex;
 
 	std::vector<unitedAtom> newCH2(1, unitedAtom());
 	
 	for (int i = 0; i < nChains; ++i)
 	{
-		lastIndex 		 = 		  lastIndices[i];
-		penultimateIndex = penultimateIndices[i];
+		iChain = nearbyint(Random::uniform(0, nChains-1));
+		lastIndex 		 = 		  lastIndices[iChain];
+		penultimateIndex = penultimateIndices[iChain];
 		int iTrial = 0;
 		while (iTrial++ < maxTrials)
 		{
@@ -581,10 +582,10 @@ bool propagateChain(std::vector<unitedAtom> &polymerChains, std::vector<int> &la
 			if (checkCollision(polymerChains, newCH2, lastIndex)) continue;
 			polymerChains.push_back(newCH2[0]);
 
-			penultimateIndices[i] = lastIndices[i];
-			lastIndices[i] 		  = polymerChains.size()-1;
+			penultimateIndices[iChain] = lastIndices[iChain];
+			lastIndices[iChain] 		  = polymerChains.size()-1;
 
-			chainLengths[i]++;
+			chainLengths[iChain]++;
 			break;
 		}
 		if (DEBUG) printf("DEBUG:: iTrial %d\n", iTrial);
