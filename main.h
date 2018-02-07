@@ -1,6 +1,6 @@
 const int nChains = 200;
 const int minChainLength = 100;
-const double mass_density = 0.9;	// units =  g/cc
+const double mass_density = 0.92;	// units =  g/cc
 
 const double N_avogadro = 6.022 * pow(10,23);
 const int nUnitedAtoms = nChains * minChainLength;

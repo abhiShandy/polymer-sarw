@@ -48,9 +48,11 @@ struct unitedAtom
 		2. CH2
 		3. CH
 	*/
+	int chainID;
 	vector3<> pos;
-	unitedAtom() : type(0), pos(vector3<>(0,0,0)) {}
+	unitedAtom() : type(0), chainID(0), pos(vector3<>(0,0,0)) {}
 	unitedAtom(int type, vector3<> pos) : type(type), pos(pos) {}
+	unitedAtom(int type, int chainID, vector3<> pos) : type(type), chainID(chainID), pos(pos) {}
 };
 
 struct Bond
@@ -323,37 +325,120 @@ void exportXSF(const std::vector<unitedAtom> polymerChains)
 	fclose(fp);
 }
 
+std::vector<Bond> 		listBonds;
+std::vector<Angle> 		listAngles;
+std::vector<Dihedral> 	listDihedrals;
 void exportLAMMPS(const std::vector<unitedAtom> polymerChains)
 {
 	printf("Exporting LAMMPS data file: polymer.data\n");
-	std::vector<Bond> 		listBonds;
-	std::vector<Angle> 		listAngles;
-	std::vector<Dihedral> 	listDihedrals;
 
 	// std::vector<int> bondVector = {1, 2, 3, 3, 3, 3, 3, 3};
 	// std::vector<int> angleVector = {109.5, 120, 120, 120};
 
 	// ------------ Counting bonds ----------------
-	for (int i = 0; i < polymerChains.size()-1; ++i)
-	{
-		if ((polymerChains[i].type == 1 && polymerChains[i+1].type == 1)) continue; // avoid the linking CH3 to another CH3
-		listBonds.push_back(Bond(1, i+1, i+2));	// offset of 1 to start index at 1
-	}
+	// for (int i = 0; i < polymerChains.size()-1; ++i)
+	// {
+	// 	if ((polymerChains[i].type == 1 && polymerChains[i+1].type == 1)) continue; // avoid the linking CH3 to another CH3
+	// 	listBonds.push_back(Bond(1, i+1, i+2));	// offset of 1 to start index at 1
+	// }
 	// ------------ Counting angles ----------------
-	for (int i = 0; i < polymerChains.size()-2; ++i)
+	int a1, a2, a3, a4;
+	int i = 0;
+	for (int iChain = 1; iChain <= nChains; ++iChain)
 	{
-		if ((polymerChains[i  ].type == 1 && polymerChains[i+1].type == 1)) continue; 	// avoid the linking CH3 to another CH3
-		if ((polymerChains[i+1].type == 1 && polymerChains[i+2].type == 1)) continue;
-		listAngles.push_back(Angle(1, i+1, i+2, i+3));
+		i = 2*iChain - 2;
+		// find the very first monomer
+		a1 = i;
+		// find the second monomer
+		while(++i < polymerChains.size())
+		{
+			if (polymerChains[i].chainID == iChain)
+			{
+				a2 = i;
+				break;
+			}
+		}
+		// find the third monomer
+		while(++i < polymerChains.size())
+		{
+			if (polymerChains[i].chainID == iChain)
+			{
+				a3 = i;
+				break;
+			}
+		}
+		while(i < polymerChains.size())
+		{
+			// add to angles list
+			listAngles.push_back(Angle(1, a1+1, a2+1, a3+1));
+			// udpate all three and repeat
+			a1 = a2; a2 = a3;
+			while(++i < polymerChains.size())
+			{
+				if (polymerChains[i].chainID == iChain)
+				{
+					a3 = i;
+					break;
+				}
+			}
+		}
 	}
 	// ------------ Counting dihedrals ----------------
-	for (int i = 0; i < polymerChains.size()-3; ++i)
+	for (int iChain = 1; iChain <= nChains; ++iChain)
 	{
-		if ((polymerChains[i  ].type == 1 && polymerChains[i+1].type == 1)) continue; 	// avoid the linking CH3 to another CH3
-		if ((polymerChains[i+1].type == 1 && polymerChains[i+2].type == 1)) continue;
-		if ((polymerChains[i+2].type == 1 && polymerChains[i+3].type == 1)) continue;
-		listDihedrals.push_back(Dihedral(1, i+1, i+2, i+3, i+4));
+		i = 2*iChain - 2;
+		// find the very first monomer
+		a1 = i;
+		// find the second monomer
+		while(++i < polymerChains.size())
+		{
+			if (polymerChains[i].chainID == iChain)
+			{
+				a2 = i;
+				break;
+			}
+		}
+		// find the third monomer
+		while(++i < polymerChains.size())
+		{
+			if (polymerChains[i].chainID == iChain)
+			{
+				a3 = i;
+				break;
+			}
+		}
+		// find the fourth monomer
+		while(++i < polymerChains.size())
+		{
+			if (polymerChains[i].chainID == iChain)
+			{
+				a4 = i;
+				break;
+			}
+		}
+		while(i < polymerChains.size())
+		{
+			// add to dihedrals list
+			listDihedrals.push_back(Dihedral(1, a1+1, a2+1, a3+1, a4+1));
+			// udpate all four and repeat
+			a1 = a2; a2 = a3; a3 = a4;
+			while(++i < polymerChains.size())
+			{
+				if (polymerChains[i].chainID == iChain)
+				{
+					a4 = i;
+					break;
+				}
+			}
+		}
 	}
+	// for (int i = 0; i < polymerChains.size()-3; ++i)
+	// {
+	// 	if ((polymerChains[i  ].type == 1 && polymerChains[i+1].type == 1)) continue; 	// avoid the linking CH3 to another CH3
+	// 	if ((polymerChains[i+1].type == 1 && polymerChains[i+2].type == 1)) continue;
+	// 	if ((polymerChains[i+2].type == 1 && polymerChains[i+3].type == 1)) continue;
+	// 	listDihedrals.push_back(Dihedral(1, i+1, i+2, i+3, i+4));
+	// }
 	// ------------ Counting impropers ----------------
 
 	FILE* fp = fopen("polymer.data", "w");
@@ -391,9 +476,9 @@ void exportLAMMPS(const std::vector<unitedAtom> polymerChains)
 
 	// ========= Atoms ==============
 	fprintf(fp, "Atoms\n\n");
-	int i = 0;
+	i = 0;
 	for (unitedAtom ua : polymerChains)
-		fprintf(fp, "%d\t%d\t1\t%lf\t%lf\t%lf\n", ++i, ua.type, ua.pos[0], ua.pos[1], ua.pos[2]);
+		fprintf(fp, "%d\t%d\t%d\t%lf\t%lf\t%lf\n", ++i, ua.type, ua.chainID, ua.pos[0], ua.pos[1], ua.pos[2]);
 	fprintf(fp, "\n");
 
 	fprintf(fp, "Bonds\n\n");
@@ -578,12 +663,14 @@ bool propagateChain(std::vector<unitedAtom> &polymerChains, std::vector<int> &la
 		while (iTrial++ < maxTrials)
 		{
 			// avoid hard-coding any number
-			newCH2[0] = unitedAtom(2, randomConePos(polymerChains, lastIndex, penultimateIndex, bondLengths[0]));
+			newCH2[0] = unitedAtom(2, iChain+1, randomConePos(polymerChains, lastIndex, penultimateIndex, bondLengths[0]));
 			if (checkCollision(polymerChains, newCH2, lastIndex)) continue;
 			polymerChains.push_back(newCH2[0]);
 
 			penultimateIndices[iChain] = lastIndices[iChain];
-			lastIndices[iChain] 		  = polymerChains.size()-1;
+			lastIndices[iChain] 	   = polymerChains.size() - 1;
+
+			listBonds.push_back(Bond(1, penultimateIndices[iChain] + 1, lastIndices[iChain] + 1));
 
 			chainLengths[iChain]++;
 			break;
@@ -609,19 +696,26 @@ Try adding a pair of CH3 and CH2 to initiate a new chain
 */
 bool initiateChain(std::vector<unitedAtom> &polymerChains, std::vector<int> &lastIndices, std::vector<int> &penultimateIndices, std::vector<int> &chainLengths)
 {
-	bool flag = true;
 	if (DEBUG) printf("DEBUG:: Entered Initiation step\n");
+
+	bool flag = true;
+	int index;
 	std::vector<unitedAtom> newChainLinks(2, unitedAtom());
+
 	for (int i = 0; i < nChains; ++i)
 	{
 		if (randomSeed(newChainLinks, polymerChains))
 		{
+			newChainLinks[0].chainID = i+1;
+			newChainLinks[1].chainID = i+1;
 			polymerChains.push_back(newChainLinks[0]);
 			polymerChains.push_back(newChainLinks[1]);
-			// update indices
-			lastIndices[i] = polymerChains.size()-1;
-			penultimateIndices[i] = polymerChains.size()-2;
-			chainLengths[i]+=2;
+			// update indices, index starts from 0
+			lastIndices[i] = polymerChains.size() - 1;
+			penultimateIndices[i] = polymerChains.size() - 2;
+			// update listBond, index starts from 1
+			listBonds.push_back(Bond(1, penultimateIndices[i]+1, lastIndices[i]+1));
+			chainLengths[i] += 2;
 			if (DEBUG) printf("DEBUG:: Initiated %dth seed\n", i);
 		}
 		else
@@ -667,15 +761,5 @@ void terminateChain(std::vector<unitedAtom> &polymerChains)
 		case 2:
 			polymerChains[chainSize-1].type = 1;
 			break;
-		// case 5: // can't add the CH2
-		// 	break;
-		// case 3:	// can't add the ring and/or CH2
-		// 	if (chainSize >= 2)
-		// 	{
-		// 		polymerChains.pop_back();
-		// 		polymerChains.pop_back();
-		// 		polymerChains[chainSize-9].type = 2;
-		// 	}
-		// 	break;
 	}
 }
