@@ -119,7 +119,7 @@ int maxElement(const std::vector<int> v);
 bool initiateChain(std::vector<unitedAtom>&, std::vector<int>&, std::vector<int>&, std::vector<int> &);
 // bool addSecondHalf(std::vector<unitedAtom>&, const std::vector<unitedAtom>);
 bool propagateChain(std::vector<unitedAtom>&, std::vector<int>&, std::vector<int>&, std::vector<int> &);
-void terminateChain(std::vector<unitedAtom>&);
+void terminateChain(std::vector<unitedAtom>&, const std::vector<int>);
 bool randomSeed(std::vector<unitedAtom>&, const std::vector<unitedAtom>);
 
 // void initialise(std::vector<unitedAtom> &);
@@ -138,11 +138,8 @@ int main(int argc, char *argv[])
 		while (polymerChains.size() < nUnitedAtoms)
 		{
 			if (!propagateChain(polymerChains, lastIndices, penultimateIndices, chainLengths)) break;
-			// shortestChain = minElement(chainLengths);
-			// longestChain = minElement(chainLengths);
-			// if (DEBUG) printf("DEBUG:: longestChain: %d\n", longestChain);
 		}
-	terminateChain(polymerChains);
+	terminateChain(polymerChains, lastIndices);
 
 	printf("\n===Exporting Files===\n");
 	// export to XYZ file for OVITO
@@ -464,9 +461,9 @@ void exportLAMMPS(const std::vector<unitedAtom> polymerChains)
 	fprintf(fp, "1\tdihedral types\n");
 	// fprintf(fp, "1\timproper types\n");
 	fprintf(fp, "\n");
-	fprintf(fp, "%lf %lf xlo xhi\n", -boxSize/2., boxSize/2.);
-	fprintf(fp, "%lf %lf ylo yhi\n", -boxSize/2., boxSize/2.);
-	fprintf(fp, "%lf %lf zlo zhi\n", -boxSize/2., boxSize/2.);
+	fprintf(fp, "0.0 %lf xlo xhi\n", boxSize);
+	fprintf(fp, "0.0 %lf ylo yhi\n", boxSize);
+	fprintf(fp, "0.0 %lf zlo zhi\n", boxSize);
 	fprintf(fp, "\n");
 
 	fprintf(fp, "Masses\n\n");
@@ -478,7 +475,7 @@ void exportLAMMPS(const std::vector<unitedAtom> polymerChains)
 	fprintf(fp, "Atoms\n\n");
 	i = 0;
 	for (unitedAtom ua : polymerChains)
-		fprintf(fp, "%d\t%d\t%d\t%lf\t%lf\t%lf\n", ++i, ua.type, ua.chainID, ua.pos[0], ua.pos[1], ua.pos[2]);
+		fprintf(fp, "%d\t%d\t%d\t%lf\t%lf\t%lf\n", ++i, ua.chainID, ua.type, ua.pos[0], ua.pos[1], ua.pos[2]);
 	fprintf(fp, "\n");
 
 	fprintf(fp, "Bonds\n\n");
@@ -751,15 +748,17 @@ bool randomSeed(std::vector<unitedAtom> &newChainLinks, const std::vector<united
 	return true;
 }
 
-void terminateChain(std::vector<unitedAtom> &polymerChains)
+void terminateChain(std::vector<unitedAtom> &polymerChains, const std::vector<int> lastIndices)
 {
 	int chainSize = polymerChains.size();
 
 	if (DEBUG) printf("DEBUG:: Terminated!! at %d\n", chainSize);
-	switch(polymerChains[chainSize-1].type)
+	for (int i = 0; i < nChains; ++i)
 	{
-		case 2:
-			polymerChains[chainSize-1].type = 1;
-			break;
+		if (polymerChains[lastIndices[i]].type == 2)
+		{
+			polymerChains[lastIndices[i]].type = 1;
+			printf("Terminated chain # %d\n", i+1);
+		}
 	}
 }
