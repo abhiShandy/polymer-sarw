@@ -12,7 +12,7 @@ const int boxSize = nearbyint(pow(10,8)*pow(nUnitedAtoms/number_density, 0.3333)
 #define DEBUG false
 #define LOG true
 
-const double minDist = 2;
+const double minDist = 2.0;
 const int maxTrials = 100;
 
 // #ifndef

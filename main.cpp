@@ -94,11 +94,6 @@ struct Dihedral
 	}
 };
 
-// std::vector<Bond> listBonds;
-// std::vector<Angle> listAngles;
-// std::vector<Dihedral> listDihedrals(nAtoms, Dihedral());
-// std::vector<Dihedral> listImpropers(nAtoms, Dihedral());
-
 // helper functions
 vector3<> randomUnitStep();
 void tetrahedral(const vector3<>, const vector3<>, vector3<>&, vector3<>&);
@@ -323,21 +318,13 @@ void exportXSF(const std::vector<unitedAtom> polymerChains)
 }
 
 std::vector<Bond> 		listBonds;
-std::vector<Angle> 		listAngles;
-std::vector<Dihedral> 	listDihedrals;
 void exportLAMMPS(const std::vector<unitedAtom> polymerChains)
 {
 	printf("Exporting LAMMPS data file: polymer.data\n");
-
-	// std::vector<int> bondVector = {1, 2, 3, 3, 3, 3, 3, 3};
-	// std::vector<int> angleVector = {109.5, 120, 120, 120};
+	std::vector<Angle> 		listAngles;
+	std::vector<Dihedral> 	listDihedrals;
 
 	// ------------ Counting bonds ----------------
-	// for (int i = 0; i < polymerChains.size()-1; ++i)
-	// {
-	// 	if ((polymerChains[i].type == 1 && polymerChains[i+1].type == 1)) continue; // avoid the linking CH3 to another CH3
-	// 	listBonds.push_back(Bond(1, i+1, i+2));	// offset of 1 to start index at 1
-	// }
 	// ------------ Counting angles ----------------
 	int a1, a2, a3, a4;
 	int i = 0;
@@ -429,13 +416,6 @@ void exportLAMMPS(const std::vector<unitedAtom> polymerChains)
 			}
 		}
 	}
-	// for (int i = 0; i < polymerChains.size()-3; ++i)
-	// {
-	// 	if ((polymerChains[i  ].type == 1 && polymerChains[i+1].type == 1)) continue; 	// avoid the linking CH3 to another CH3
-	// 	if ((polymerChains[i+1].type == 1 && polymerChains[i+2].type == 1)) continue;
-	// 	if ((polymerChains[i+2].type == 1 && polymerChains[i+3].type == 1)) continue;
-	// 	listDihedrals.push_back(Dihedral(1, i+1, i+2, i+3, i+4));
-	// }
 	// ------------ Counting impropers ----------------
 
 	FILE* fp = fopen("polymer.data", "w");
@@ -461,15 +441,14 @@ void exportLAMMPS(const std::vector<unitedAtom> polymerChains)
 	fprintf(fp, "1\tdihedral types\n");
 	// fprintf(fp, "1\timproper types\n");
 	fprintf(fp, "\n");
-	fprintf(fp, "0.0 %lf xlo xhi\n", boxSize);
-	fprintf(fp, "0.0 %lf ylo yhi\n", boxSize);
-	fprintf(fp, "0.0 %lf zlo zhi\n", boxSize);
+	fprintf(fp, "0.0 %d xlo xhi\n", boxSize);
+	fprintf(fp, "0.0 %d ylo yhi\n", boxSize);
+	fprintf(fp, "0.0 %d zlo zhi\n", boxSize);
 	fprintf(fp, "\n");
 
 	fprintf(fp, "Masses\n\n");
 	for (int i=0;i<2;i++) fprintf(fp, "%d\t%lf\n", i+1, atomMass[i]);
 	fprintf(fp, "\n");
-	// ========= Coefficients ==============
 
 	// ========= Atoms ==============
 	fprintf(fp, "Atoms\n\n");
@@ -648,6 +627,7 @@ bool propagateChain(std::vector<unitedAtom> &polymerChains, std::vector<int> &la
 	// propagate all chains, if possible
 	// udpate indices and lengths
 	int iChain, lastIndex, penultimateIndex;
+	bool flag = true;
 
 	std::vector<unitedAtom> newCH2(1, unitedAtom());
 	
@@ -672,17 +652,20 @@ bool propagateChain(std::vector<unitedAtom> &polymerChains, std::vector<int> &la
 			chainLengths[iChain]++;
 			break;
 		}
+		flag = flag && (iTrial-1 >= maxTrials);
+
 		if (DEBUG) printf("DEBUG:: iTrial %d\n", iTrial);
-		if (DEBUG && iTrial-1 < maxTrials)
+		if (iTrial-1 < maxTrials)
 		{
-			printf("DEBUG:: Propagated %dth chain at %d\n", i, polymerChains.size());
-			// printf("%.3f\n", newCH2[0].pos[0]);
+			if (DEBUG) printf("DEBUG:: Propagated %dth chain at %d\n", i, polymerChains.size());
+			if (LOG) printf("LOG:: Progress = %d\n", 100*polymerChains.size()/nUnitedAtoms);
 		}
 	}
 	// if (iTrial >= maxTrials){
 	//	if (DEBUG) printf("DEBUG:: Propagatation failed at %d\n", polymerChains.size());
 	//	return false;
 	//}
+	if (flag) return false;
 	return true;
 }
 
@@ -758,7 +741,7 @@ void terminateChain(std::vector<unitedAtom> &polymerChains, const std::vector<in
 		if (polymerChains[lastIndices[i]].type == 2)
 		{
 			polymerChains[lastIndices[i]].type = 1;
-			printf("Terminated chain # %d\n", i+1);
+			if (DEBUG) printf("Terminated chain # %d\n", i+1);
 		}
 	}
 }
