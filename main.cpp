@@ -8,13 +8,14 @@
 // latest strategy - 29 Jan 2018 - construct the backbone and then add side-branches
 
 
-#include "Random.h"
-#include "matrix3.h"
-#include "scalar.h"
-#include "Euler.h"
-#include "LatticeUtils.h"
+// #include <core/LatticeUtils.h>
+// #include <core/scalar.h>
+#include <core/Random.cpp>
+#include <core/matrix3.h>
+#include <fluid/Euler.h>
 #include <iostream>
 #include <fstream>
+#include <math.h>
 #include "main.h"
 
 const char species[6][10] = {"", "CH3", "CH2", "CH", "CH_aro", "C_aro"};
@@ -47,6 +48,7 @@ struct unitedAtom
 		1. CH3
 		2. CH2
 		3. CH
+		4. Si
 	*/
 	int chainID;
 	vector3<> pos;
@@ -125,6 +127,13 @@ int main(int argc, char *argv[])
 	std::vector<int> lastIndices(nChains);
 	std::vector<int> penultimateIndices(nChains);
 	std::vector<int> chainLengths(nChains);
+
+	#ifdef CENTER_SEED
+	int seed_vol = (4./3) * M_PI * pow(seed_radius, 3);
+	boxSize = nearbyint(pow(pow(boxSize, 3) + seed_vol, 0.3333));
+	unitedAtom center_seed = unitedAtom(4, vector3<>(boxSize*0.5, boxSize*0.5, boxSize*0.5));
+	// polymerChains.push_back(center_seed);
+	#endif
 	
 	printf("===Self Avoiding Random Walk===\n");
 	
@@ -287,6 +296,17 @@ bool checkCollision(
 		}
 		if (flag) break;
 	}
+	if (flag) return flag;
+
+	#ifdef CENTER_SEED
+	for (int j = 0; j < newChainSize; ++j)
+	{
+		unitedAtom center_seed = unitedAtom(4, vector3<>(boxSize*0.5, boxSize*0.5, boxSize*0.5));
+		vector3<> dist = (newChainLinks[j].pos - center_seed.pos);
+		if (dist.length() < seed_radius) { flag = true; break;}
+	}
+	#endif
+
 	return flag;
 }
 
@@ -627,7 +647,7 @@ bool propagateChain(std::vector<unitedAtom> &polymerChains, std::vector<int> &la
 	// propagate all chains, if possible
 	// udpate indices and lengths
 	int iChain, lastIndex, penultimateIndex;
-	bool flag = true;
+	bool flag = true, lengthFlag;
 
 	std::vector<unitedAtom> newCH2(1, unitedAtom());
 	
@@ -642,17 +662,23 @@ bool propagateChain(std::vector<unitedAtom> &polymerChains, std::vector<int> &la
 			// avoid hard-coding any number
 			newCH2[0] = unitedAtom(2, iChain+1, randomConePos(polymerChains, lastIndex, penultimateIndex, bondLengths[0]));
 			if (checkCollision(polymerChains, newCH2, lastIndex)) continue;
-			polymerChains.push_back(newCH2[0]);
+			lengthFlag = false;
+			// lengthFlag = chainLengths[iChain] >= minChainLength;
+			if (!lengthFlag)
+			{
+				polymerChains.push_back(newCH2[0]);
 
-			penultimateIndices[iChain] = lastIndices[iChain];
-			lastIndices[iChain] 	   = polymerChains.size() - 1;
+				penultimateIndices[iChain] = lastIndices[iChain];
+				lastIndices[iChain] 	   = polymerChains.size() - 1;
 
-			listBonds.push_back(Bond(1, penultimateIndices[iChain] + 1, lastIndices[iChain] + 1));
+				listBonds.push_back(Bond(1, penultimateIndices[iChain] + 1, lastIndices[iChain] + 1));
 
-			chainLengths[iChain]++;
+				chainLengths[iChain]++;
+			}
 			break;
 		}
 		flag = flag && (iTrial-1 >= maxTrials);
+		// flag = flag && ((iTrial-1 >= maxTrials) || lengthFlag);
 
 		if (DEBUG) printf("DEBUG:: iTrial %d\n", iTrial);
 		if (iTrial-1 < maxTrials)
