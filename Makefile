@@ -1,4 +1,5 @@
-JDFTX_BUILD_DIR=$(HOME)/Code/JDFTx/build
+JDFTX_BUILD_DIR=$(HOME)/Programs/jdftx/build
+JDFTx_DIR=$(HOME)/Programs/jdftx/jdftx-git/jdftx
 
 default:
 	g++ -std=c++11 -O3 \
