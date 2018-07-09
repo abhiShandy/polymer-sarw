@@ -10,7 +10,7 @@
 
 // #include <core/LatticeUtils.h>
 // #include <core/scalar.h>
-#include <core/Random.cpp>
+#include <core/Random.h>
 #include <core/matrix3.h>
 #include <fluid/Euler.h>
 #include <iostream>
@@ -238,8 +238,8 @@ vector3<> wrapPBC(const vector3<> pos)
 	vector3<> wrappedPos = pos;
 	for (int i = 0; i < 3; ++i)
 	{
-		if 		(pos[i] < 0) 	   wrappedPos[i] += boxSize;
-		else if (pos[i] > boxSize) wrappedPos[i] -= boxSize;
+		if 		(pos[i] < 0) 	   wrappedPos[i] += boxSize[i];
+		else if (pos[i] > boxSize[i]) wrappedPos[i] -= boxSize[i];
 	}
 	return wrappedPos;
 }
@@ -285,9 +285,8 @@ bool checkCollision(
 		for (int j = 0; j < newChainSize; ++j)
 		{
 			vector3<> dist = (polymerChains[i].pos - newChainLinks[j].pos);
-			dist[0] -= boxSize * nearbyint(dist[0] / boxSize);
-			dist[1] -= boxSize * nearbyint(dist[1] / boxSize);
-			dist[2] -= boxSize * nearbyint(dist[2] / boxSize);
+			for (int k = 0; k < 3; ++k)
+				dist[k] -= boxSize[k] * nearbyint(dist[k] / boxSize[k]);
 			if (dist.length() < minDist)
 			{
 				flag = true;
@@ -301,7 +300,7 @@ bool checkCollision(
 	#ifdef CENTER_SEED
 	for (int j = 0; j < newChainSize; ++j)
 	{
-		unitedAtom center_seed = unitedAtom(4, vector3<>(boxSize*0.5, boxSize*0.5, boxSize*0.5));
+		unitedAtom center_seed = unitedAtom(4, vector3<>(boxSize[0]*0.5, boxSize[1]*0.5, boxSize[2]*0.5));
 		vector3<> dist = (newChainLinks[j].pos - center_seed.pos);
 		if (dist.length() < seed_radius) { flag = true; break;}
 	}
@@ -326,10 +325,10 @@ void exportXSF(const std::vector<unitedAtom> polymerChains)
 	printf("Exporting XSF file: polymer.xsf\n");
 	FILE* fp = fopen("polymer.xsf", "w");
 	fprintf(fp, "CRYSTAL\nPRIMVEC\n");
-	fprintf(fp, "%d.0\t0.0\t0.0\n0.0\t%d.0\t0.0\n0.0\t0.0\t%d.0\n", boxSize, boxSize, boxSize);
+	fprintf(fp, "%d.0\t0.0\t0.0\n0.0\t%d.0\t0.0\n0.0\t0.0\t%d.0\n", boxSize[0], boxSize[1], boxSize[2]);
 
 	fprintf(fp, "CONVVEC\n");
-	fprintf(fp, "%d.0\t0.0\t0.0\n0.0\t%d.0\t0.0\n0.0\t0.0\t%d.0\n", boxSize, boxSize, boxSize);
+	fprintf(fp, "%d.0\t0.0\t0.0\n0.0\t%d.0\t0.0\n0.0\t0.0\t%d.0\n", boxSize[0], boxSize[1], boxSize[2]);
 
 	fprintf(fp, "PRIMCOORD\n%d\t%d\n", polymerChains.size(), 1);
 	for (unitedAtom atom : polymerChains)
@@ -461,9 +460,9 @@ void exportLAMMPS(const std::vector<unitedAtom> polymerChains)
 	fprintf(fp, "1\tdihedral types\n");
 	// fprintf(fp, "1\timproper types\n");
 	fprintf(fp, "\n");
-	fprintf(fp, "0.0 %d xlo xhi\n", boxSize);
-	fprintf(fp, "0.0 %d ylo yhi\n", boxSize);
-	fprintf(fp, "0.0 %d zlo zhi\n", boxSize);
+	fprintf(fp, "0.0 %d xlo xhi\n", boxSize[0]);
+	fprintf(fp, "0.0 %d ylo yhi\n", boxSize[1]);
+	fprintf(fp, "0.0 %d zlo zhi\n", boxSize[2]);
 	fprintf(fp, "\n");
 
 	fprintf(fp, "Masses\n\n");
@@ -527,7 +526,7 @@ void printReport(const std::vector<unitedAtom> polymerChains, const std::vector<
 
 	printf("\n===Report===\n");
 	
-	printf("\nBoxSize\t: %d\n", boxSize);
+	printf("\nBoxSize\t: %d x %d x %d\n", boxSize[0], boxSize[1], boxSize[2]);
 	
 	printf("\nnUnitedAtoms::\n");
 	printf("Desired\t: %d\n", nUnitedAtoms);
@@ -537,13 +536,14 @@ void printReport(const std::vector<unitedAtom> polymerChains, const std::vector<
 	// printf("Desired\t: %d\n", nChains);
 	// printf("Actual\t: %d\n",  nChains_actual);
 	
+	int vol = (boxSize[0]*boxSize[1]*boxSize[2]);
 	printf("\nNumber Density::\n");
-	printf("Desired\t: %.2f\n", pow(10,-24)*number_density);
-	printf("Actual\t: %.2f\n", (polymerChains.size())/pow(boxSize, 3));
+	printf("Desired\t: %.3e\n", number_density);
+	printf("Actual\t: %.3e\n", polymerChains.size()/(vol*pow(10,-24)));
 
 	printf("\nMass Density::\n");
 	printf("Desired\t: %.2f\n", mass_density);
-	printf("Actual\t: %.2f\n", ( 14 * polymerChains.size() )/(N_avogadro * pow(boxSize*pow(10,-8), 3)));
+	printf("Actual\t: %.2f\n", ( 14*polymerChains.size() )/(N_avogadro*vol*pow(10,-24)) );
 
 	// for (int i = 0; i < chainLengths.size(); i+=2)
 	// 	chainLengths[i] = (chainLengths[i+1] - chainLengths[i]);
@@ -743,9 +743,10 @@ bool randomSeed(std::vector<unitedAtom> &newChainLinks, const std::vector<united
 	{
 		// random CH3 seed in the box
 		pos0 = vector3<>(
-			Random::uniform(0, boxSize),
-			Random::uniform(0, boxSize),
-			Random::uniform(0, boxSize));
+			Random::uniform(0, boxSize[0]),
+			Random::uniform(0, boxSize[1]),
+			0.0);
+		if (RANDOM_SEED) pos0[2] = Random::uniform(0, boxSize[2]);
 
 		// CH atom at a random position on a sphere around the CH3 seed
 		step = bondLengths[0] * randomUnitStep();
