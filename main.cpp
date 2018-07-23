@@ -7,9 +7,6 @@
 
 // latest strategy - 29 Jan 2018 - construct the backbone and then add side-branches
 
-
-// #include <core/LatticeUtils.h>
-// #include <core/scalar.h>
 #include <core/Random.h>
 #include <core/matrix3.h>
 #include <fluid/Euler.h>
@@ -26,17 +23,6 @@ const double bondLengths[] =
 		1.51,	//CH 	 - C_aro
 		1.40	//CH_aro - CH_aro
 	};
-
-// const double bondAngles[] =
-// 	{
-// 		112,	//CH3 -	CH - CH2
-// 		114,	//CH - CH2 - CH
-// 		109.5,	//CH3 - CH - C_aro
-// 		120,	//C_aro - CH_aro - CH_aro
-// 		120,	//CH_aro - CH_aro - CH_aro
-// 		120,	//CH_aro - CH_aro - C_aro
-// 		120		//CH_aro - C_aro - CH
-// 	};
 
 const double atomMass[] = {15, 14, 13, 13, 12};
 
@@ -98,8 +84,6 @@ struct Dihedral
 
 // helper functions
 vector3<> randomUnitStep();
-void tetrahedral(const vector3<>, const vector3<>, vector3<>&, vector3<>&);
-vector3<> wrapPBC(const vector3<>);
 vector3<> randomConePos(const std::vector<unitedAtom>, const int, const int, const double);
 
 bool checkCollision(const std::vector<unitedAtom>, const std::vector<unitedAtom>, const int ignoreIndex = -1);
@@ -109,24 +93,19 @@ void exportXYZ(const std::vector<unitedAtom>);
 void exportXSF(const std::vector<unitedAtom>);
 void exportLAMMPS(const std::vector<unitedAtom>);
 void printReport(const std::vector<unitedAtom>, std::vector<int>);
-int minElement(const std::vector<int> v);
-int maxElement(const std::vector<int> v);
 
 // chain operations
 bool initiateChain(std::vector<unitedAtom>&, std::vector<int>&, std::vector<int>&, std::vector<int> &);
-// bool addSecondHalf(std::vector<unitedAtom>&, const std::vector<unitedAtom>);
 bool propagateChain(std::vector<unitedAtom>&, std::vector<int>&, std::vector<int>&, std::vector<int> &);
 void terminateChain(std::vector<unitedAtom>&, const std::vector<int>);
 bool randomSeed(std::vector<unitedAtom>&, const std::vector<unitedAtom>);
 
-// void initialise(std::vector<unitedAtom> &);
-
 int main(int argc, char *argv[])
 {
 	std::vector<unitedAtom> polymerChains;	// contains all finalised united atoms
-	std::vector<int> lastIndices(nChains);
-	std::vector<int> penultimateIndices(nChains);
-	std::vector<int> chainLengths(nChains);
+	std::vector<int> lastIndices(nChains); // index of last united atom of each chain in polymerChains[]
+	std::vector<int> penultimateIndices(nChains); // index of penulutimate united atom of each chain in polymerChains[]
+	std::vector<int> chainLengths(nChains);	// length of each polymer chain
 
 	#ifdef CENTER_SEED
 	int seed_vol = (4./3) * M_PI * pow(seed_radius, 3);
@@ -140,55 +119,17 @@ int main(int argc, char *argv[])
 	int shortestChain = 0, longestChain = 0;
 	if (initiateChain(polymerChains, lastIndices, penultimateIndices, chainLengths))
 		while (polymerChains.size() < nUnitedAtoms)
-		{
 			if (!propagateChain(polymerChains, lastIndices, penultimateIndices, chainLengths)) break;
-		}
 	terminateChain(polymerChains, lastIndices);
 
 	printf("\n===Exporting Files===\n");
-	// export to XYZ file for OVITO
-	exportXYZ(polymerChains);
-	// export to XSF file for VESTA
-	exportXSF(polymerChains);
-	// export to LAMMPS data file
-	exportLAMMPS(polymerChains);
+	exportXYZ(polymerChains); // export to XYZ file for OVITO
+	exportXSF(polymerChains); // export to XSF file for VESTA
+	exportLAMMPS(polymerChains); // export to LAMMPS data file
 
 	printReport(polymerChains, chainLengths);
 
 	return 0;
-}
-
-/* 
-	initialise 
-		- the side-branch based on desired polymer
-	useless for now
-*/
-void initialise(std::vector<unitedAtom> &sideBranch)
-{
-
-	// Aromatic Ring for poly-styrene
-	#ifdef POLYSTYRENE
-	double d  = bondLengths[2];
-	double dz = d * cos(M_PI/3);
-	double dx = d * sin(M_PI/3);
-
-	sideBranch.push_back( unitedAtom(5, vector3<>(  0, 0,    0)) );
-	sideBranch.push_back( unitedAtom(4, vector3<>(-dx, 0,   dz)) );
-	sideBranch.push_back( unitedAtom(4, vector3<>(-dx, 0,   dz + d)) );
-	sideBranch.push_back( unitedAtom(4, vector3<>(  0, 0, 2*dz + d)) );
-	sideBranch.push_back( unitedAtom(4, vector3<>( dx, 0,   dz + d)) );
-	sideBranch.push_back( unitedAtom(4, vector3<>( dx, 0,   dz)) );
-	#endif
-
-	// CH3 for Propylene
-	#ifdef POLYPROPYLENE
-	sideBranch.push_back( unitedAtom(1, vector3<>(  0, 0,    0)) );
-	#endif
-
-	// nothing for Poly-ethylene
-	#ifdef POLYETHYLENE
-	// sideBranch.push_back( unitedAtom(1, vector3<>(  0, 0,    0)) );
-	#endif
 }
 
 vector3<> randomUnitStep()
@@ -196,52 +137,6 @@ vector3<> randomUnitStep()
 	vector3<> step(Random::uniform(), Random::uniform(), Random::uniform());
 	step = normalize(step);
 	return step;
-}
-
-
-int maxElement(const std::vector<int> v)
-{
-	int ans = v[0];
-	for (int i : v)
-		if (ans < i) ans = i;
-	return ans;
-}
-
-int minElement(const std::vector<int> v)
-{
-	int ans = v[0];
-	for (int i : v)
-		if (ans > i) ans = i;
-	return ans;
-}
-
-// useless for now
-void tetrahedral(const vector3<> a, const vector3<> b, vector3<> &c, vector3<> &d)
-{
-	vector3<> z = normalize(cross(a, b));
-	vector3<> y = normalize(a + b);
-	vector3<> x = normalize(cross(y, z));
-
-	matrix3<> rot1, rot2, rot_mat;
-
-	rot1.set_rows(x, y, z);
-	rot2 = matrixFromEuler(vector3<>(M_PI, M_PI/2, 0));
-	rot_mat = ~rot1*rot2*rot1;
-
-	c = rot_mat * a;
-	d = rot_mat * b;
-}
-
-// useless for now
-vector3<> wrapPBC(const vector3<> pos)
-{
-	vector3<> wrappedPos = pos;
-	for (int i = 0; i < 3; ++i)
-	{
-		if 		(pos[i] < 0) 	   wrappedPos[i] += boxSize[i];
-		else if (pos[i] > boxSize[i]) wrappedPos[i] -= boxSize[i];
-	}
-	return wrappedPos;
 }
 
 vector3<> randomConePos(const std::vector<unitedAtom> polymerChains, const int lastIndex, const int penultimateIndex, const double distance)
@@ -552,92 +447,6 @@ void printReport(const std::vector<unitedAtom> polymerChains, const std::vector<
 	FILE* fp = fopen("chains.dat", "w");
 	for (int i : chainLengths) fprintf(fp, "%d\n", i);
 	fclose(fp);
-}
-
-// ring and CH2 together - useless for now
-bool addSecondHalf(std::vector<unitedAtom> &polymerChains, const std::vector<unitedAtom> sideBranch)
-{
-	// initialize local variables
-	vector3<> ringPos, r12, r10, rCH, rCH2, pos1, pos2;
-	matrix3<> localCoords;
-	int iTrial, index;
-
-	index = polymerChains.size();
-	rCH  = polymerChains[index-1].pos;
-	
-	// try adding aromatic ring and CH2
-	std::vector<unitedAtom> newChainLinks;
-	iTrial = 0;
-	while (iTrial++ < maxTrials)
-	{
-		newChainLinks.clear();
-		ringPos = randomConePos(polymerChains, index-1, index-2, bondLengths[1]);
-
-		// calculate the plane to place the ring 
-		r12 = normalize(polymerChains[index-2].pos - rCH);
-		r10 = normalize(ringPos - rCH);
-		localCoords.set_row(2, r10);
-		localCoords.set_row(0, normalize(r12 - r10 * dot(r10, r12)));
-		localCoords.set_row(1, normalize(cross(localCoords.row(2), localCoords.row(0))));
-
-		for (int i = 0; i < sideBranch.size(); ++i)
-			newChainLinks.push_back( unitedAtom(sideBranch[i].type, ringPos + sideBranch[i].pos * localCoords) );
-
-		tetrahedral(r12, r10, pos1, pos2);
-		// discrete choice
-		rCH2 = (Random::uniform() > 0.5)? pos1 : pos2;
-		newChainLinks.push_back( unitedAtom(2, bondLengths[1]*rCH2 + rCH) );
-
-		if (checkCollision(polymerChains, newChainLinks)) continue;
-		polymerChains.insert(polymerChains.end(), newChainLinks.begin(), newChainLinks.end());
-		break;
-	}
-
-	if (iTrial < maxTrials) return true;
-	
-	iTrial = 0;
-	while (iTrial++ < maxTrials)
-	{
-		newChainLinks.clear();
-		ringPos = randomConePos(polymerChains, index-1, index-2, bondLengths[1]);
-
-		// calculate the plane to place the ring 
-		r12 = normalize(polymerChains[index-2].pos - rCH);
-		r10 = normalize(ringPos - rCH);
-		localCoords.set_row(2, r10);
-		localCoords.set_row(0, normalize(r12 - r10 * dot(r10, r12)));
-		localCoords.set_row(1, normalize(cross(localCoords.row(2), localCoords.row(0))));
-
-		for (int i = 0; i < sideBranch.size(); ++i)
-			newChainLinks.push_back( unitedAtom(sideBranch[i].type, ringPos + sideBranch[i].pos * localCoords) );
-
-		if (checkCollision(polymerChains, newChainLinks)) continue;
-		polymerChains.insert(polymerChains.end(), newChainLinks.begin(), newChainLinks.end());
-		break;
-	}
-	// printf("Tried %d times for just the ring at %d\n", iTrial, index);
-	// if (iTrial >= maxTrials) return false;
-	
-	// iTrial = 0;
-	// newChainLinks.resize(1);
-	// while (iTrial++ < maxTrials)
-	// {
-	// 	ringPos = randomConePos(polymerChains, index-1, index-2, bondLengths[1]);
-	// 	r12 = normalize(polymerChains[index-2].pos - rCH);
-	// 	r10 = normalize(ringPos - rCH);
-
-	// 	tetrahedral(r12, r10, pos1, pos2);
-	// 	// discrete choice
-	// 	rCH2 = (Random::uniform() > 0.5)? pos1 : pos2;
-	// 	newChainLinks[0] = unitedAtom(2, bondLengths[1]*rCH2 + rCH);
-
-	// 	if (checkCollision(polymerChains, newChainLinks)) continue;
-	// 	polymerChains.insert(polymerChains.end(), newChainLinks.begin(), newChainLinks.end());
-	// 	break;
-	// }
-	// printf("Tried %d times for CH2 after the ring at %d\n", iTrial, index);
-	// if (iTrial < maxTrials) return true;
-	return false;
 }
 
 // add CH2 on a cone of tetrahedral angle
