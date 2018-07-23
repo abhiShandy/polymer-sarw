@@ -425,8 +425,9 @@ bool propagateChain(std::vector<unitedAtom> &polymerChains, std::vector<int> &la
     
     for (int i = 0; i < nChains; ++i)
     {
-        // TODO : add switch for Round-Robin selection of chainSize
-        iChain = nearbyint(Random::uniform(0, nChains-1));
+        if (ROUND_ROBIN) iChain = i;
+        else iChain = nearbyint(Random::uniform(0, nChains-1));
+
         lastIndex = lastIndices[iChain];
         penultimateIndex = penultimateIndices[iChain];
         
