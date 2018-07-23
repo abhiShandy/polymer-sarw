@@ -106,13 +106,6 @@ int main(int argc, char *argv[])
 	std::vector<int> lastIndices(nChains); // index of last united atom of each chain in polymerChains[]
 	std::vector<int> penultimateIndices(nChains); // index of penulutimate united atom of each chain in polymerChains[]
 	std::vector<int> chainLengths(nChains);	// length of each polymer chain
-
-	#ifdef CENTER_SEED
-	int seed_vol = (4./3) * M_PI * pow(seed_radius, 3);
-	boxSize = nearbyint(pow(pow(boxSize, 3) + seed_vol, 0.3333));
-	unitedAtom center_seed = unitedAtom(4, vector3<>(boxSize*0.5, boxSize*0.5, boxSize*0.5));
-	// polymerChains.push_back(center_seed);
-	#endif
 	
 	printf("===Self Avoiding Random Walk===\n");
 	
@@ -191,15 +184,6 @@ bool checkCollision(
 		if (flag) break;
 	}
 	if (flag) return flag;
-
-	#ifdef CENTER_SEED
-	for (int j = 0; j < newChainSize; ++j)
-	{
-		unitedAtom center_seed = unitedAtom(4, vector3<>(boxSize[0]*0.5, boxSize[1]*0.5, boxSize[2]*0.5));
-		vector3<> dist = (newChainLinks[j].pos - center_seed.pos);
-		if (dist.length() < seed_radius) { flag = true; break;}
-	}
-	#endif
 
 	return flag;
 }
