@@ -98,7 +98,7 @@ void printReport(const std::vector<unitedAtom>, std::vector<int>);
 bool initiateChain(std::vector<unitedAtom>&, std::vector<int>&, std::vector<int>&, std::vector<int> &);
 bool propagateChain(std::vector<unitedAtom>&, std::vector<int>&, std::vector<int>&, std::vector<int> &);
 void terminateChain(std::vector<unitedAtom>&, const std::vector<int>);
-bool randomSeed(std::vector<unitedAtom>&, const std::vector<unitedAtom>);
+bool randomSeed(std::vector<unitedAtom>&, const std::vector<unitedAtom>, const int);
 
 int main(int argc, char *argv[])
 {
@@ -470,21 +470,21 @@ bool initiateChain(std::vector<unitedAtom> &polymerChains, std::vector<int> &las
 
     std::vector<unitedAtom> newChainLinks(2, unitedAtom());
 
-    for (int i = 0; i < nChains; ++i)
+    for (int iChain = 0; iChain < nChains; ++iChain)
     {
-        if (randomSeed(newChainLinks, polymerChains))
+        if (randomSeed(newChainLinks, polymerChains, iChain))
         {
-            newChainLinks[0].chainID = i+1;
-            newChainLinks[1].chainID = i+1;
+            newChainLinks[0].chainID = iChain+1;
+            newChainLinks[1].chainID = iChain+1;
             polymerChains.push_back(newChainLinks[0]);
             polymerChains.push_back(newChainLinks[1]);
             // update indices, index starts from 0
-            lastIndices[i] = polymerChains.size() - 1;
-            penultimateIndices[i] = polymerChains.size() - 2;
+            lastIndices[iChain] = polymerChains.size() - 1;
+            penultimateIndices[iChain] = polymerChains.size() - 2;
             // update listBond, index starts from 1
-            listBonds.push_back(Bond(1, penultimateIndices[i]+1, lastIndices[i]+1));
-            chainLengths[i] += 2;
-            if (DEBUG) printf("DEBUG:: Initiated %dth seed\n", i);
+            listBonds.push_back(Bond(1, penultimateIndices[iChain]+1, lastIndices[iChain]+1));
+            chainLengths[iChain] += 2;
+            if (DEBUG) printf("DEBUG:: Initiated %dth seed\n", iChain);
         }
         else
             return false;
@@ -503,7 +503,7 @@ Outputs:
     - boolean: true if it successfully found a random location for the seed, otherwise false
     - location of random seed in newChainLinks
 */
-bool randomSeed(std::vector<unitedAtom> &newChainLinks, const std::vector<unitedAtom> polymerChains)
+bool randomSeed(std::vector<unitedAtom> &newChainLinks, const std::vector<unitedAtom> polymerChains, const int iChain)
 {
     vector3<> step, pos0;
     int iTrial = 0;
@@ -514,7 +514,7 @@ bool randomSeed(std::vector<unitedAtom> &newChainLinks, const std::vector<united
             Random::uniform(0, boxSize[0]),
             Random::uniform(0, boxSize[1]),
             0.0);
-        if (RANDOM_SEED) pos0[2] = Random::uniform(0, boxSize[2]);
+        if (iChain > graftFraction*nChains) pos0[2] = Random::uniform(0, boxSize[2]);
 
         // CH atom at a random position on a sphere around the CH3 seed
         step = bondLengths[0] * randomUnitStep();
