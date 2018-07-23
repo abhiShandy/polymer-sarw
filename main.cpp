@@ -449,7 +449,10 @@ void printReport(const std::vector<unitedAtom> polymerChains, const std::vector<
 	fclose(fp);
 }
 
-// add CH2 on a cone of tetrahedral angle
+/* Chain propagation
+ - add CH2 on a cone of tetrahedral angle
+ - TODO: add side-chain(s)
+ */
 bool propagateChain(std::vector<unitedAtom> &polymerChains, std::vector<int> &lastIndices, std::vector<int> &penultimateIndices, std::vector<int> &chainLengths)
 {
 	if (DEBUG) printf("DEBUG:: Entered Propagation step\n");
@@ -463,31 +466,26 @@ bool propagateChain(std::vector<unitedAtom> &polymerChains, std::vector<int> &la
 	for (int i = 0; i < nChains; ++i)
 	{
 		iChain = nearbyint(Random::uniform(0, nChains-1));
-		lastIndex 		 = 		  lastIndices[iChain];
+		lastIndex = lastIndices[iChain];
 		penultimateIndex = penultimateIndices[iChain];
+		
 		int iTrial = 0;
 		while (iTrial++ < maxTrials)
 		{
 			// avoid hard-coding any number
 			newCH2[0] = unitedAtom(2, iChain+1, randomConePos(polymerChains, lastIndex, penultimateIndex, bondLengths[0]));
 			if (checkCollision(polymerChains, newCH2, lastIndex)) continue;
-			lengthFlag = false;
-			// lengthFlag = chainLengths[iChain] >= minChainLength;
-			if (!lengthFlag)
-			{
-				polymerChains.push_back(newCH2[0]);
+			
+			polymerChains.push_back(newCH2[0]);
 
-				penultimateIndices[iChain] = lastIndices[iChain];
-				lastIndices[iChain] 	   = polymerChains.size() - 1;
+			penultimateIndices[iChain] = lastIndices[iChain];
+			lastIndices[iChain] 	   = polymerChains.size() - 1;
+			listBonds.push_back(Bond(1, penultimateIndices[iChain] + 1, lastIndices[iChain] + 1));
+			chainLengths[iChain]++;
 
-				listBonds.push_back(Bond(1, penultimateIndices[iChain] + 1, lastIndices[iChain] + 1));
-
-				chainLengths[iChain]++;
-			}
 			break;
 		}
-		flag = flag && (iTrial-1 >= maxTrials);
-		// flag = flag && ((iTrial-1 >= maxTrials) || lengthFlag);
+		flag = flag && (iTrial-1 >= maxTrials);	// TODO: recheck the logic
 
 		if (DEBUG) printf("DEBUG:: iTrial %d\n", iTrial);
 		if (iTrial-1 < maxTrials)
@@ -496,12 +494,7 @@ bool propagateChain(std::vector<unitedAtom> &polymerChains, std::vector<int> &la
 			if (LOG) printf("LOG:: Progress = %d\n", 100*polymerChains.size()/nUnitedAtoms);
 		}
 	}
-	// if (iTrial >= maxTrials){
-	//	if (DEBUG) printf("DEBUG:: Propagatation failed at %d\n", polymerChains.size());
-	//	return false;
-	//}
-	if (flag) return false;
-	return true;
+	return !flag;
 }
 
 /*
@@ -513,8 +506,6 @@ bool initiateChain(std::vector<unitedAtom> &polymerChains, std::vector<int> &las
 {
 	if (DEBUG) printf("DEBUG:: Entered Initiation step\n");
 
-	bool flag = true;
-	int index;
 	std::vector<unitedAtom> newChainLinks(2, unitedAtom());
 
 	for (int i = 0; i < nChains; ++i)
@@ -534,16 +525,22 @@ bool initiateChain(std::vector<unitedAtom> &polymerChains, std::vector<int> &las
 			if (DEBUG) printf("DEBUG:: Initiated %dth seed\n", i);
 		}
 		else
-		{
-			flag = false;
-			break;
-		}
+			return false;
 	}
-	if (DEBUG && flag) printf("DEBUG:: Initiated %d seeds\n", nChains);
+	if (DEBUG) printf("DEBUG:: Initiated %d seeds\n", nChains);
 
-	return flag;
+	return true;
 }
 
+/*
+Place randomly located seeds:
+Inputs:
+	- an empty vector of 2 unitedAtoms
+	- list of all unitedAtoms added so far
+Outputs:
+	- boolean: true if it successfully found a random location for the seed, otherwise false
+	- location of random seed in newChainLinks
+*/
 bool randomSeed(std::vector<unitedAtom> &newChainLinks, const std::vector<unitedAtom> polymerChains)
 {
 	vector3<> step, pos0;
@@ -574,10 +571,7 @@ void terminateChain(std::vector<unitedAtom> &polymerChains, const std::vector<in
 	if (DEBUG) printf("DEBUG:: Terminated!! at %d\n", chainSize);
 	for (int i = 0; i < nChains; ++i)
 	{
-		if (polymerChains[lastIndices[i]].type == 2)
-		{
-			polymerChains[lastIndices[i]].type = 1;
-			if (DEBUG) printf("Terminated chain # %d\n", i+1);
-		}
+		polymerChains[lastIndices[i]].type = 1;
+		if (DEBUG) printf("Terminated chain # %d\n", i+1);
 	}
 }
