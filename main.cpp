@@ -210,7 +210,6 @@ void exportXSF(const std::vector<unitedAtom> polymerChains)
 /*
 Export DAT file for LAMMPS input
 - TODO : use Class/Struct for passing all data structures
-- TODO : refactor angle and dihedral counter code
 */
 std::vector<Bond> listBonds;
 void exportLAMMPS(const std::vector<unitedAtom> polymerChains)
@@ -219,96 +218,27 @@ void exportLAMMPS(const std::vector<unitedAtom> polymerChains)
     std::vector<Angle>      listAngles;
     std::vector<Dihedral>   listDihedrals;
 
-    // ------------ Counting bonds ----------------
-    // ------------ Counting angles ----------------
+    // ------------ Counting Angles and Dihedrals ----------------
     int a1, a2, a3, a4;
     int i = 0;
     for (int iChain = 1; iChain <= nChains; ++iChain)
     {
-        i = 2*iChain - 2;
-        // find the very first monomer
-        a1 = i;
-        // find the second monomer
-        while(++i < polymerChains.size())
-        {
-            if (polymerChains[i].chainID == iChain)
-            {
-                a2 = i;
-                break;
-            }
-        }
-        // find the third monomer
-        while(++i < polymerChains.size())
-        {
-            if (polymerChains[i].chainID == iChain)
-            {
-                a3 = i;
-                break;
-            }
-        }
+        a1=-1, a2=-1, a3=-1, a4=-1;
+        // the very first monomer of iChain
+        i = 2*iChain - 2; a4 = i;
         while(i < polymerChains.size())
         {
-            // add to angles list
-            listAngles.push_back(Angle(1, a1+1, a2+1, a3+1));
-            // udpate all three and repeat
-            a1 = a2; a2 = a3;
+            // if all three indices are found, add to angles list
+            if (a2>-1) listAngles.push_back(Angle(1, a1+1, a2+1, a3+1));
+            // if all four indices are found, add to dihedrals list
+            if(a1>-1) listDihedrals.push_back(Dihedral(1, a1+1, a2+1, a3+1, a4+1));
+            // search for next set, and udpate all indices
             while(++i < polymerChains.size())
-            {
                 if (polymerChains[i].chainID == iChain)
                 {
-                    a3 = i;
+                    a1 = a2; a2 = a3; a3 = a4; a4=i;
                     break;
                 }
-            }
-        }
-    }
-    // ------------ Counting dihedrals ----------------
-    for (int iChain = 1; iChain <= nChains; ++iChain)
-    {
-        i = 2*iChain - 2;
-        // find the very first monomer
-        a1 = i;
-        // find the second monomer
-        while(++i < polymerChains.size())
-        {
-            if (polymerChains[i].chainID == iChain)
-            {
-                a2 = i;
-                break;
-            }
-        }
-        // find the third monomer
-        while(++i < polymerChains.size())
-        {
-            if (polymerChains[i].chainID == iChain)
-            {
-                a3 = i;
-                break;
-            }
-        }
-        // find the fourth monomer
-        while(++i < polymerChains.size())
-        {
-            if (polymerChains[i].chainID == iChain)
-            {
-                a4 = i;
-                break;
-            }
-        }
-        while(i < polymerChains.size())
-        {
-            // add to dihedrals list
-            listDihedrals.push_back(Dihedral(1, a1+1, a2+1, a3+1, a4+1));
-            // udpate all four and repeat
-            a1 = a2; a2 = a3; a3 = a4;
-            while(++i < polymerChains.size())
-            {
-                if (polymerChains[i].chainID == iChain)
-                {
-                    a4 = i;
-                    break;
-                }
-            }
         }
     }
     // ------------ Counting impropers ----------------
