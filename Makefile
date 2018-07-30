@@ -5,5 +5,5 @@
 
 default:
 	g++ -std=c++11 -O3 \
-	-I $(JDFTx_DIR) -L $(JDFTx_BUILD_DIR) -Wl,-rpath,$(JDFTx_BUILD_DIR) \
+	-I $(JDFTx_SRC_DIR) -L $(JDFTx_BUILD_DIR) -Wl,-rpath,$(JDFTx_BUILD_DIR) \
 	-o main main.cpp -ljdftx
