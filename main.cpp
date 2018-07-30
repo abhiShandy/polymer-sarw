@@ -2,7 +2,6 @@
 *   Developed by Abhishek Shandilya
 *   to-do
     1. periodic lookup
-    2. book-keeping bonds
 */
 
 // latest strategy - 29 Jan 2018 - construct the backbone and then add side-branches
@@ -229,7 +228,7 @@ void exportLAMMPS(const std::vector<unitedAtom> polymerChains)
         while(i < polymerChains.size())
         {
             // if all three indices are found, add to angles list
-            if (a2>-1) listAngles.push_back(Angle(1, a1+1, a2+1, a3+1));
+            if (a2>-1) listAngles.push_back(Angle(1, a2+1, a3+1, a4+1));
             // if all four indices are found, add to dihedrals list
             if(a1>-1) listDihedrals.push_back(Dihedral(1, a1+1, a2+1, a3+1, a4+1));
             // search for next set, and udpate all indices
