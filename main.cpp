@@ -11,9 +11,11 @@
 #include <fluid/Euler.h>
 #include <iostream>
 #include <fstream>
+#include <vector>
 #include <math.h>
 #include "main.h"
 
+/////////////////////// GLOBAL VARIABLES & CLASSES /////////////////////
 const char species[6][10] = {"", "CH3", "CH2", "CH", "CH_aro", "C_aro"};
 
 const double bondLengths[] =
@@ -81,23 +83,23 @@ struct Dihedral
     }
 };
 
-// helper functions
+//////////////////////////////////// helper functions /////////////////////////////////////
 vector3<> randomUnitStep();
 vector3<> randomConePos(const std::vector<unitedAtom>, const int, const int, const double);
 
 bool checkCollision(const std::vector<unitedAtom>, const std::vector<unitedAtom>, const int ignoreIndex = -1);
 
-// export functions
+/////////////////////////////////// export functions //////////////////////////////////////
 void exportXYZ(const std::vector<unitedAtom>);
 void exportXSF(const std::vector<unitedAtom>);
 void exportLAMMPS(const std::vector<unitedAtom>);
 void printReport(const std::vector<unitedAtom>, std::vector<int>);
 
-// chain operations
+//////////////////////////////////// chain operations ////////////////////////////////////
 bool initiateChain(std::vector<unitedAtom>&, std::vector<int>&, std::vector<int>&, std::vector<int> &);
 bool propagateChain(std::vector<unitedAtom>&, std::vector<int>&, std::vector<int>&, std::vector<int> &);
 void terminateChain(std::vector<unitedAtom>&, const std::vector<int>);
-bool randomSeed(std::vector<unitedAtom>&, const std::vector<unitedAtom>, const int);
+bool randomSeed(std::vector<unitedAtom>&, const std::vector<unitedAtom>, const int, const std::vector<float>);
 
 int main(int argc, char *argv[])
 {
@@ -392,17 +394,38 @@ bool propagateChain(std::vector<unitedAtom> &polymerChains, std::vector<int> &la
 Try adding a pair of CH3 and CH2 to initiate a new chain
     if successful - add the united-atoms to data-structure, and return true
     if failed - return false, which means no more chains can be added
+Input
+    - file containing location of silica graft points (FILE FORMAT: x y z)
+
+
 */
 bool initiateChain(std::vector<unitedAtom> &polymerChains, std::vector<int> &lastIndices, std::vector<int> &penultimateIndices, std::vector<int> &chainLengths)
 {
+    // Store graft locations in matrix
+    std::ifstream graft_pos("graft.dat");
+    float x,y,z;
+    std::vector<float> graft;
+    std::vector<std::vector<float> > grafts;
+    while (graft_pos >> x >> y >> z) {
+        graft.push_back(x);
+        graft.push_back(y);
+        graft.push_back(z);
+        grafts.push_back(graft);
+        graft.clear(); // use graft as dummy variable for random seed when non grafting
+    }
+    
     if (DEBUG) printf("DEBUG:: Entered Initiation step\n");
 
     std::vector<unitedAtom> newChainLinks(2, unitedAtom());
 
+    // Loop through each chain and initiate
     for (int iChain = 0; iChain < nChains; ++iChain)
     {
-        if (randomSeed(newChainLinks, polymerChains, iChain))
-        {
+        bool grafted = iChain < grafts.size(); // graft atoms extracted from graft.dat
+        bool seeded = false;
+        if (grafted) seeded = randomSeed(newChainLinks, polymerChains, iChain, grafts[(int)iChain]); // graft
+        else seeded =  randomSeed(newChainLinks, polymerChains, iChain, graft); // no graft, 'graft' is empty, cleared after reading file
+        if (seeded) {
             newChainLinks[0].chainID = iChain+1;
             newChainLinks[1].chainID = iChain+1;
             polymerChains.push_back(newChainLinks[0]);
@@ -432,18 +455,20 @@ Outputs:
     - boolean: true if it successfully found a random location for the seed, otherwise false
     - location of random seed in newChainLinks
 */
-bool randomSeed(std::vector<unitedAtom> &newChainLinks, const std::vector<unitedAtom> polymerChains, const int iChain)
+bool randomSeed(std::vector<unitedAtom> &newChainLinks, const std::vector<unitedAtom> polymerChains, const int iChain, const std::vector<float>graft)
 {
     vector3<> step, pos0;
     int iTrial = 0;
     while (iTrial++ < maxTrials)
     {
         // random CH3 seed in the box
-        pos0 = vector3<>(
-            Random::uniform(0, boxSize[0]),
-            Random::uniform(0, boxSize[1]),
-            0.0);
-        if (iChain > graftFraction*nChains) pos0[2] = Random::uniform(0, boxSize[2]);
+        if (!graft.empty()) pos0 = vector3<>(graft[0],graft[1],graft[2]); // if atom is grafted, seed from here
+        else {								  // if atom is not grafted, seed randomly
+            pos0 = vector3<>(
+                Random::uniform(0, boxSize[0]),
+                Random::uniform(0, boxSize[1]),
+                Random::uniform(0, boxSize[2]));
+        }
 
         // CH atom at a random position on a sphere around the CH3 seed
         step = bondLengths[0] * randomUnitStep();
