@@ -23,3 +23,10 @@ main.log	- same output as that on the terminal while running the CPP program
 polymer.XYZ 	- type and cartesian coordinates of all particles, can be opened in Ovito and XMD
 polymer.XSF	- box size, and coordinates of all particles, particles are not distinguishable as Carbon is used to represent both the types, can be opened in VESTA
 polymer.data	- data file in the prescribed LAMMPS format, can be read in using 'read_data' command in LAMMPS,
+
+## TODO
+
+- [ ] arbitrary constraints on a particular component of positions (eg. grow polymer backbone on a plane)
+- [ ] Use Classes/Objects to pass the data around
+- [ ] Break down the code into multiple files
+- [ ] Input file for reading the customizable parameters
