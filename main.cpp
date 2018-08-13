@@ -15,7 +15,7 @@
 #include <math.h>
 #include "main.h"
 
-/////////////////////// GLOBAL VARIABLES & CLASSES /////////////////////
+/////////////////////// GLOBAL VARIABLES & STRUCTS /////////////////////
 const char species[6][10] = {"", "CH3", "CH2", "CH", "CH_aro", "C_aro"};
 
 const double bondLengths[] =
@@ -26,6 +26,8 @@ const double bondLengths[] =
     };
 
 const double atomMass[] = {15, 14, 13, 13, 12};
+
+std::vector<vector3<>> grafts;
 
 struct unitedAtom
 {
@@ -99,7 +101,7 @@ void printReport(const std::vector<unitedAtom>, std::vector<int>);
 bool initiateChain(std::vector<unitedAtom>&, std::vector<int>&, std::vector<int>&, std::vector<int> &);
 bool propagateChain(std::vector<unitedAtom>&, std::vector<int>&, std::vector<int>&, std::vector<int> &);
 void terminateChain(std::vector<unitedAtom>&, const std::vector<int>);
-bool randomSeed(std::vector<unitedAtom>&, const std::vector<unitedAtom>, const int, const std::vector<float>);
+bool randomSeed(std::vector<unitedAtom>&, const std::vector<unitedAtom>, const int, const std::vector<vector3<>>);
 
 int main(int argc, char *argv[])
 {
@@ -156,6 +158,11 @@ vector3<> randomConePos(const std::vector<unitedAtom> polymerChains, const int l
     return newPos;
 }
 
+/*
+Check Collision of a potential section of chain
+- return true if colliding
+- return false if the chain can be added
+*/
 bool checkCollision(
     const std::vector<unitedAtom> polymerChains,
     const std::vector<unitedAtom> newChainLinks,
@@ -165,7 +172,10 @@ bool checkCollision(
 
     chainSize    = polymerChains.size();
     newChainSize = newChainLinks.size();
-    
+
+    double zMin = 0.;
+    for (vector3<> g : grafts) zMin = zMin < g.z() ? g.z() : zMin;
+
     for (int i = 0; i < chainSize; ++i)
     {
         if (ignoreIndex >= 0 && i==ignoreIndex) continue;
@@ -174,7 +184,7 @@ bool checkCollision(
             vector3<> dist = (polymerChains[i].pos - newChainLinks[j].pos);
             for (int k = 0; k < 3; ++k) // minimum image convention
                 dist[k] -= boxSize[k] * nearbyint(dist[k] / boxSize[k]);
-            if (dist.length() < minDist)
+            if ((dist.length() < minDist) || (newChainLinks[j].pos[0] < 0) || (newChainLinks[j].pos[1] < 0) || (newChainLinks[j].pos[2] < zMin))
                 return true;
         }
     }
@@ -215,7 +225,7 @@ Export DAT file for LAMMPS input
 std::vector<Bond> listBonds;
 void exportLAMMPS(const std::vector<unitedAtom> polymerChains)
 {
-    printf("Exporting LAMMPS data file: polymer.data\n");
+    printf("Exporting LAMMPS data file: polymer.dat\n");
     std::vector<Angle>      listAngles;
     std::vector<Dihedral>   listDihedrals;
 
@@ -244,7 +254,7 @@ void exportLAMMPS(const std::vector<unitedAtom> polymerChains)
     }
     // ------------ Counting impropers ----------------
 
-    FILE* fp = fopen("polymer.data", "w");
+    FILE* fp = fopen("polymer.dat", "w");
     #ifdef POLYSTYRENE
     fprintf(fp, "POLYSTYRENE CHAINS\n\n");
     #endif
@@ -404,14 +414,8 @@ bool initiateChain(std::vector<unitedAtom> &polymerChains, std::vector<int> &las
     // Store graft locations in matrix
     std::ifstream graft_pos("graft.dat");
     float x,y,z;
-    std::vector<float> graft;
-    std::vector<std::vector<float> > grafts;
     while (graft_pos >> x >> y >> z) {
-        graft.push_back(x);
-        graft.push_back(y);
-        graft.push_back(z);
-        grafts.push_back(graft);
-        graft.clear(); // use graft as dummy variable for random seed when non grafting
+        grafts.push_back(vector3<>(x,y,z));
     }
     
     if (DEBUG) printf("DEBUG:: Entered Initiation step\n");
@@ -421,11 +425,8 @@ bool initiateChain(std::vector<unitedAtom> &polymerChains, std::vector<int> &las
     // Loop through each chain and initiate
     for (int iChain = 0; iChain < nChains; ++iChain)
     {
-        bool grafted = iChain < grafts.size(); // graft atoms extracted from graft.dat
-        bool seeded = false;
-        if (grafted) seeded = randomSeed(newChainLinks, polymerChains, iChain, grafts[(int)iChain]); // graft
-        else seeded =  randomSeed(newChainLinks, polymerChains, iChain, graft); // no graft, 'graft' is empty, cleared after reading file
-        if (seeded) {
+        if (randomSeed(newChainLinks, polymerChains, iChain, grafts))
+        {
             newChainLinks[0].chainID = iChain+1;
             newChainLinks[1].chainID = iChain+1;
             polymerChains.push_back(newChainLinks[0]);
@@ -455,15 +456,19 @@ Outputs:
     - boolean: true if it successfully found a random location for the seed, otherwise false
     - location of random seed in newChainLinks
 */
-bool randomSeed(std::vector<unitedAtom> &newChainLinks, const std::vector<unitedAtom> polymerChains, const int iChain, const std::vector<float>graft)
+bool randomSeed(std::vector<unitedAtom> &newChainLinks, 
+    const std::vector<unitedAtom> polymerChains,
+    const int iChain,
+    const std::vector<vector3<>> grafts)
 {
     vector3<> step, pos0;
     int iTrial = 0;
     while (iTrial++ < maxTrials)
     {
-        // random CH3 seed in the box
-        if (!graft.empty()) pos0 = vector3<>(graft[0],graft[1],graft[2]); // if atom is grafted, seed from here
-        else {								  // if atom is not grafted, seed randomly
+        if (iChain < grafts.size()) // if atom is grafted, seed from here
+            pos0 = vector3<>(grafts[iChain][0], grafts[iChain][1], grafts[iChain][2]);
+        else // if atom is not grafted, seed randomly
+        {
             pos0 = vector3<>(
                 Random::uniform(0, boxSize[0]),
                 Random::uniform(0, boxSize[1]),
