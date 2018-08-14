@@ -129,7 +129,7 @@ int main(int argc, char *argv[])
 
 vector3<> randomUnitStep()
 {
-    vector3<> step(Random::uniform(), Random::uniform(), Random::uniform());
+    vector3<> step(Random::uniform(-1,1), Random::uniform(-1,1), Random::uniform(-1,1));
     step = normalize(step);
     return step;
 }
