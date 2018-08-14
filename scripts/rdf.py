@@ -56,69 +56,11 @@ def rdfChains(atoms, rMin, dr):
 	rdfInter /= rdfDen
 	return rdfIntra, rdfInter, rdfDen, binEdges
 
-'''
-def rdf(atoms,rdftype):
-    
-    atoms is an array saved in the form of [chainID, x, y, z]
-    rdftype selects whether desired rdf is interchain or intrachain
-    
-    cum_rdf = [] # Store the cumulative average rdf based on inter/intra
-    for atom in atoms:   # Iterate through all atoms
-        print atom
-        refAtom = atom              # Set this current atom as the reference atom
-        dist = atoms-refAtom        # Find the distance b/w refAtom and all atoms
-        dist[...,1:] = dist[...,1:]/L
-        dist[...,1:] -= np.floor(0.5 + dist[...,1:])
-        dist[...,1:] *= L
-        rdf = []                    # Stores the rdf for the current refAtom
-        if rdftype == 'intra':
-            dist = dist[np.where(dist[...,0]==0)]  # get the distances from refAtom if chainID value after dist calc = 0 for intra rdf
-        elif rdftype == 'inter':
-            dist = dist[np.where(dist[...,0]!=0)]  # get the distances from refAtom if chainID value after dist calc != for inter rdf
-        norm = np.linalg.norm(dist,axis=1)         # Get scalar distance
-        rMax = np.amax(norm)                       # pick an arbitrary maximum radius to perform rdf
-        rMax += 50                   # add a buffer to make sure that all the atoms are accounted for
-        radii = np.arange(0,rMax)    # create an array of radii to iterate over for the rdf
-        dr = 1.                      # use this assigned range to determine the rdf
-        for r in radii:
-            #normalize = (0.92 * NA / (1e21)) * 4 * np.pi * r**2 * dr
-            rdf.append((len(norm[abs(norm -r - dr/2.) < dr/2.])))#/normalize)  # store in rdf the atoms within desired range of rdf
-        rdf=np.array(rdf)            # convert to np array
-        cum_rdf.append(rdf)          # store current rdf in a list
-    cum_rdf = np.array(cum_rdf)      # convert to np array
-    # Make all of the arrays within cum_rdf the same length
-    # Different lengths due to different chain lengths in the system
-    b = np.zeros([len(cum_rdf),len(max(cum_rdf,key=lambda x: len(x)))])
-    for i,j in enumerate(cum_rdf):
-        b[i][0:len(j)] = j
-    mean_rdf = np.mean(b,axis=0)     # take the average of all the intra/inter rdfs for the system
-    radii = np.arange(0,len(mean_rdf))  # make radii the same length for plotting
-
-    return mean_rdf,radii
-
-def uniform(radii):
-    distr = np.random.uniform(0.,1.,(12391,3))
-    refAtom = distr[0]
-    dist = distr-refAtom
-    dist -= np.floor(0.5 + distr)
-    dist *= L
-    norm = np.linalg.norm(dist,axis=1)
-    rMax = np.amax(norm)
-    rMax += 50
-    radii = np.arange(0,rMax)
-    dr = 1.
-    rdf = []
-    for r in radii:
-        rdf.append((len(norm[abs(norm -r - dr/2.) < dr/2.])))
-    rdf = np.array(rdf)
-    return rdf,radii
-'''
-
 if __name__ == "__main__":
     NA = 6.022e23
     L = np.array([42.,42.,336.])
 
-    filename = 'polymer.data'
+    filename = 'polymer.dat'
 
     with open(filename) as lines:
         # Stores Chain ID, Position x, Position y, Position z
