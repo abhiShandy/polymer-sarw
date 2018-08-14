@@ -13,7 +13,7 @@
 #include <fstream>
 #include <vector>
 #include <math.h>
-#include "main.h"
+#include "sarw.h"
 
 /////////////////////// GLOBAL VARIABLES & STRUCTS /////////////////////
 const char species[6][10] = {"", "CH3", "CH2", "CH", "CH_aro", "C_aro"};
