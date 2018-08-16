@@ -6,32 +6,20 @@
 #include <fstream>
 #include "sarw.h"
 
-bool checkCollision(const SARW& s, const std::vector<unitedAtom>, const int ignoreIndex = -1);
-
 int main(int argc, char *argv[])
 {
     printf("===Self Avoiding Random Walk===\n");
     SARW s = SARW(); 
     
-    // if (initiateChain(polymerChains, lastIndices, penultimateIndices, chainLengths)) // try initiating chains, if successful move on to next step
-    //     while (actualCount() < nUnitedAtoms) // if total number of united atoms is less than the target
-    //         if (!propagateChain(polymerChains, lastIndices, penultimateIndices, chainLengths)) break; // propagate the chain, unless it fails
-    // terminateChain(polymerChains, lastIndices); // terminate the chains by changing the type of the last unitedAtom
-    if (initiateChain(s)) // try initiating chains, if successful move on to next step
+    if (s.initiateChain()) // try initiating chains, if successful move on to next step
         while (s.actualCount() < s.targetCount()) // if total number of united atoms is less than the target
-            if (!propagateChain(s)) break; // propagate the chain, unless it fails
-    terminateChain(s); // terminate the chains by changing the type of the last unitedAtom
+            if (!s.propagateChain()) break; // propagate the chain, unless it fails
+    s.terminateChain(); // terminate the chains by changing the type of the last unitedAtom
 
     printf("\n===Exporting Files===\n");
-    // exportPolymer(s);
     s.calcAnglesDihedrals();
     s.exportLAMMPS();
     s.report();
-    // exportXYZ(polymerChains); // export to XYZ file for OVITO
-    // exportXSF(polymerChains); // export to XSF file for VESTA
-    // exportLAMMPS(polymerChains); // export to LAMMPS data file
-
-    // printReport(polymerChains, chainLengths);
 
     return 0;
 }
@@ -72,28 +60,25 @@ Check Collision of a potential section of chain
 - return true if colliding
 - return false if the chain can be added
 */
-bool checkCollision(
-    const SARW& s,
-    const std::vector<unitedAtom> newChainLinks,
-    const int ignoreIndex)
+bool SARW::checkCollision(const std::vector<unitedAtom> newChainLinks, const int ignoreIndex)
 {
     int newChainSize, chainSize;
 
-    chainSize    = s.actualCount();
+    chainSize    = actualCount();
     newChainSize = newChainLinks.size();
 
     double zMin = 0.;
-    for (vector3<> g : s.grafts) zMin = zMin < g.z() ? g.z() : zMin;
+    for (vector3<> g : grafts) zMin = zMin < g.z() ? g.z() : zMin;
 
     for (int i = 0; i < chainSize; ++i)
     {
         if (ignoreIndex >= 0 && i==ignoreIndex) continue;
         for (int j = 0; j < newChainSize; ++j)
         {
-            vector3<> dist = (s.polymerChains[i].pos - newChainLinks[j].pos);
+            vector3<> dist = (polymerChains[i].pos - newChainLinks[j].pos);
             for (int k = 0; k < 3; ++k) // minimum image convention
-                dist[k] -= s.boxSize[k] * nearbyint(dist[k] / s.boxSize[k]);
-            if ((dist.length() < s.minDist) || (newChainLinks[j].pos[0] < 0) || (newChainLinks[j].pos[1] < 0) || (newChainLinks[j].pos[2] < zMin))
+                dist[k] -= boxSize[k] * nearbyint(dist[k] / boxSize[k]);
+            if ((dist.length() < minDist) || (newChainLinks[j].pos[0] < 0) || (newChainLinks[j].pos[1] < 0) || (newChainLinks[j].pos[2] < zMin))
                 return true;
         }
     }
@@ -104,7 +89,7 @@ bool checkCollision(
  - add CH2 on a cone of tetrahedral angle
  - TODO: add side-chain(s)
  */
-bool propagateChain(SARW& s)
+bool SARW::propagateChain()
 {
     if (DEBUG) printf("DEBUG:: Entered Propagation step\n");
     // propagate all chains, if possible
@@ -114,37 +99,37 @@ bool propagateChain(SARW& s)
 
     std::vector<unitedAtom> newCH2(1, unitedAtom());
     
-    for (int i = 0; i < s.nChains; ++i)
+    for (int i = 0; i < nChains; ++i)
     {
         if (ROUND_ROBIN) iChain = i;
-        else iChain = nearbyint(Random::uniform(0, s.nChains-1));
+        else iChain = nearbyint(Random::uniform(0, nChains-1));
 
-        lastIndex = s.lastIndices[iChain];
-        penultimateIndex = s.penultimateIndices[iChain];
+        lastIndex = lastIndices[iChain];
+        penultimateIndex = penultimateIndices[iChain];
         
         int iTrial = 0;
-        while (iTrial++ < s.maxTrials)
+        while (iTrial++ < maxTrials)
         {
             // avoid hard-coding any number
-            newCH2[0] = unitedAtom(2, iChain+1, randomConePos(s.polymerChains, lastIndex, penultimateIndex, bondLengths[0]));
-            if (checkCollision(s, newCH2, lastIndex)) continue;
+            newCH2[0] = unitedAtom(2, iChain+1, randomConePos(polymerChains, lastIndex, penultimateIndex, bondLengths[0]));
+            if (checkCollision(newCH2, lastIndex)) continue;
             
-            s.polymerChains.push_back(newCH2[0]);
+            polymerChains.push_back(newCH2[0]);
 
-            s.penultimateIndices[iChain] = s.lastIndices[iChain];
-            s.lastIndices[iChain]        = s.actualCount() - 1;
-            s.listBonds.push_back(Bond(1, s.penultimateIndices[iChain] + 1, s.lastIndices[iChain] + 1));
-            s.chainLengths[iChain]++;
+            penultimateIndices[iChain] = lastIndices[iChain];
+            lastIndices[iChain]        = actualCount() - 1;
+            listBonds.push_back(Bond(1, penultimateIndices[iChain] + 1, lastIndices[iChain] + 1));
+            chainLengths[iChain]++;
 
             break;
         }
-        flag = flag && (iTrial-1 >= s.maxTrials); // TODO: recheck the logic
+        flag = flag && (iTrial-1 >= maxTrials); // TODO: recheck the logic
 
         if (DEBUG) printf("DEBUG:: iTrial %d\n", iTrial);
-        if (iTrial-1 < s.maxTrials)
+        if (iTrial-1 < maxTrials)
         {
-            if (DEBUG) printf("DEBUG:: Propagated %dth chain at %d\n", i, s.actualCount());
-            if (LOG) printf("LOG:: Progress = %d\n", 100*s.actualCount()/s.targetCount());
+            if (DEBUG) printf("DEBUG:: Propagated %dth chain at %d\n", i, actualCount());
+            if (LOG) printf("LOG:: Progress = %d\n", 100*actualCount()/targetCount());
         }
     }
     return !flag;
@@ -159,13 +144,13 @@ Input
 
 
 */
-bool initiateChain(SARW& s)
+bool SARW::initiateChain()
 {
     // Store graft locations in matrix
     std::ifstream graft_pos("graft.dat");
     float x,y,z;
     while (graft_pos >> x >> y >> z) {
-        s.grafts.push_back(vector3<>(x,y,z));
+        grafts.push_back(vector3<>(x,y,z));
     }
     
     if (DEBUG) printf("DEBUG:: Entered Initiation step\n");
@@ -173,26 +158,26 @@ bool initiateChain(SARW& s)
     std::vector<unitedAtom> newChainLinks(2, unitedAtom());
 
     // Loop through each chain and initiate
-    for (int iChain = 0; iChain < s.nChains; ++iChain)
+    for (int iChain = 0; iChain < nChains; ++iChain)
     {
-        if (randomSeed(s, newChainLinks, iChain))
+        if (randomSeed(newChainLinks, iChain))
         {
             newChainLinks[0].chainID = iChain+1;
             newChainLinks[1].chainID = iChain+1;
-            s.polymerChains.push_back(newChainLinks[0]);
-            s.polymerChains.push_back(newChainLinks[1]);
+            polymerChains.push_back(newChainLinks[0]);
+            polymerChains.push_back(newChainLinks[1]);
             // update indices, index starts from 0
-            s.lastIndices[iChain] = s.actualCount() - 1;
-            s.penultimateIndices[iChain] = s.actualCount() - 2;
+            lastIndices[iChain] = actualCount() - 1;
+            penultimateIndices[iChain] = actualCount() - 2;
             // update listBond, index starts from 1
-            s.listBonds.push_back(Bond(1, s.penultimateIndices[iChain]+1, s.lastIndices[iChain]+1));
-            s.chainLengths[iChain] += 2;
+            listBonds.push_back(Bond(1, penultimateIndices[iChain]+1, lastIndices[iChain]+1));
+            chainLengths[iChain] += 2;
             if (DEBUG) printf("DEBUG:: Initiated %dth seed\n", iChain);
         }
         else
             return false;
     }
-    if (DEBUG) printf("DEBUG:: Initiated %d seeds\n", s.nChains);
+    if (DEBUG) printf("DEBUG:: Initiated %d seeds\n", nChains);
 
     return true;
 }
@@ -206,40 +191,38 @@ Outputs:
     - boolean: true if it successfully found a random location for the seed, otherwise false
     - location of random seed in newChainLinks
 */
-bool randomSeed(const SARW& s, std::vector<unitedAtom>& newChainLinks, const int iChain)
+bool SARW::randomSeed(std::vector<unitedAtom>& newChainLinks, const int iChain)
 {
     vector3<> step, pos0;
     int iTrial = 0;
-    while (iTrial++ < s.maxTrials)
+    while (iTrial++ < maxTrials)
     {
-        if (iChain < s.nGrafts()) // if atom is grafted, seed from here
-            pos0 = vector3<>(s.grafts[iChain][0], s.grafts[iChain][1], s.grafts[iChain][2]);
+        if (iChain < nGrafts()) // if atom is grafted, seed from here
+            pos0 = vector3<>(grafts[iChain][0], grafts[iChain][1], grafts[iChain][2]);
         else // if atom is not grafted, seed randomly
         {
             pos0 = vector3<>(
-                Random::uniform(0, s.boxSize[0]),
-                Random::uniform(0, s.boxSize[1]),
-                Random::uniform(0, s.boxSize[2]));
+                Random::uniform(0, boxSize[0]),
+                Random::uniform(0, boxSize[1]),
+                Random::uniform(0, boxSize[2]));
         }
 
         // CH atom at a random position on a sphere around the CH3 seed
         step = bondLengths[0] * randomUnitStep();
         newChainLinks[0] = (unitedAtom(1, pos0));
         newChainLinks[1] = (unitedAtom(2, pos0 + step));
-        if (!checkCollision(s, newChainLinks)) break;
+        if (!checkCollision(newChainLinks)) break;
     }
-    if (iTrial >= s.maxTrials) return false;
+    if (iTrial >= maxTrials) return false;
     return true;
 }
 
-void terminateChain(SARW& s)
+void SARW::terminateChain()
 {
-    int chainSize = s.actualCount();
-
-    if (DEBUG) printf("DEBUG:: Terminated!! at %d\n", chainSize);
-    for (int i = 0; i < s.nChains; ++i)
+    if (DEBUG) printf("DEBUG:: Terminated!! at %d\n", actualCount());
+    for (int i = 0; i < nChains; ++i)
     {
-        s.polymerChains[s.lastIndices[i]].type = 1;
+        polymerChains[lastIndices[i]].type = 1;
         if (DEBUG) printf("Terminated chain # %d\n", i+1);
     }
 }

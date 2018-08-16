@@ -28,7 +28,6 @@ polymer.data	- data file in the prescribed LAMMPS format, can be read in using '
 
 - [ ] arbitrary constraints on a particular component of positions (eg. grow polymer backbone on a plane)
 - [x] Use Classes/Objects to pass the data around
-- [ ] Break down the code into multiple files
 - [ ] Input file for reading the customizable parameters
 - [ ] Periodic Lookup table
 - [ ] Construct backbone and then add sideChains

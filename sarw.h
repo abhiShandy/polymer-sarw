@@ -1,5 +1,5 @@
-#ifndef SARW_SARW_H
-#define SARW_SARW_H
+#ifndef SARW_H
+#define SARW_H
 
 //#define POLYSTYRENE
 //#define POLYPROPYLENE
@@ -7,6 +7,7 @@
 #define DEBUG false
 #define LOG true
 #define ROUND_ROBIN true
+#define Avogadro 6.022e23
 
 #include <core/Random.h>
 #include <core/vector3.h>
@@ -72,7 +73,6 @@ struct Dihedral
 //double mass_density = 0.92; // in g/cc
 //double graftFraction = 0.20;
 //int seed_radius = 10;
-//double N_avogadro = 6.022 * pow(10,23);
 //double number_density = N_avogadro*mass_density/14.0; // units = per cc
 // int sideLength = nearbyint(pow(10,8)*pow(nUnitedAtoms/number_density, 0.3333));
 class SARW
@@ -89,7 +89,6 @@ public:
   std::vector<Bond> listBonds;
   std::vector<Angle> listAngles;
   std::vector<Dihedral> listDihedrals;
-
   std::vector<vector3<>> grafts;
   std::vector<unitedAtom> polymerChains; // contains all finalised united atoms
   std::vector<int> lastIndices; // index of last united atom of each chain in polymerChains[]
@@ -105,33 +104,35 @@ public:
   }
   
   // #### Member Functions ####
+  // - ## important quantities ##
   int nBonds() const {return (int)listBonds.size();}
   int nAngles() const {return (int)listAngles.size();}
   int nDihedrals() const {return (int)listDihedrals.size();}
   int nGrafts() const {return (int)grafts.size();}
-
   int targetCount() const { return nChains * minChainLength; }
   int actualCount() const { return polymerChains.size(); }
   int vol() const { return boxSize[0]*boxSize[1]*boxSize[2]; }
-  double actualMassDensity()  const { return ( 14.0*actualCount() )/(6.022e23 * vol() * 1e-24); }
-  double targetNumberDensity()  const { return 6.022e23 * targetMassDensity /14.0; }
-  double actualNumberDensity()  const { return 6.022e23 * actualMassDensity() /14.0; }
+  double actualMassDensity()  const { return ( 14.0*actualCount() )/(Avogadro * vol() * 1e-24); }
+  double targetNumberDensity()  const { return Avogadro * targetMassDensity /14.0; }
+  double actualNumberDensity()  const { return Avogadro * actualMassDensity() /14.0; }
+  
+  // - ## export functions ##
   void calcAnglesDihedrals();
   void exportXYZ() const;
   void exportXSF() const;
   void exportLAMMPS() const;
   void report() const;
- 
+  // - ## chain operations ##
+  bool initiateChain();
+  bool propagateChain();
+  void terminateChain();
+  bool randomSeed(std::vector<unitedAtom>& newChainLinks, const int iChain);
+  bool checkCollision(const std::vector<unitedAtom>, const int ignoreIndex = -1);
 };
 
-//////////////////////////////////// chain operations ////////////////////////////////////
-bool initiateChain(SARW& s);
-bool propagateChain(SARW& s);
-void terminateChain(SARW& s);
-bool randomSeed(const SARW& s, std::vector<unitedAtom>& newChainLinks, const int iChain);
 
 //////////////////////////////////// helper functions /////////////////////////////////////
 vector3<> randomUnitStep();
 vector3<> randomConePos(const std::vector<unitedAtom>, const int, const int, const double);
 
-#endif // SARW_SARW_H
+#endif // SARW_H
