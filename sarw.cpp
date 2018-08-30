@@ -4,19 +4,53 @@
 
 #include <iostream>
 #include <fstream>
+#include <core/Random.h>
+#include "InputMap.h"
 #include "sarw.h"
+#include "config.h"
 
-int main(int argc, char *argv[])
+int main(int argc, char **argv)
 {
-    printf("===Self Avoiding Random Walk===\n");
-    SARW s = SARW(); 
-    
+    InitParams ip = SARW::initialize(argc, argv, "Self Avoiding Random Walk");
+    InputMap inputMap(ip.inputFilename);
+
+    // set parameters from input file
+    int nChains = inputMap.get("nChains", 1);
+    SARW s = SARW(nChains);
+    s.minChainLength = inputMap.get("minChainLength", 2);
+    s.boxSize = inputMap.getVector("boxSize", vector3<>(10,10,10));
+    s.maxTrials = inputMap.get("maxTrials", 100);
+    s.targetMassDensity = inputMap.get("targetMassDensity", 0.92);
+    s.minDist = inputMap.get("minDist", 2.0);
+    s.roundRobin = inputMap.getString("roundRobin")=="yes";
+    s.polymer = inputMap.getString("polymer");
+    s.setLogFlags(inputMap.getString("logProgress"), inputMap.getString("logSteps"));
+    s.graftedSeeds = inputMap.getString("graftedSeeds")=="yes";
+    s.growthBias = inputMap.getVector("growthBias", vector3<>(0,0,0));
+
+    logPrintf("\nINPUTS:\n");
+    logPrintf("nChains = %d\n", s.nChains);
+    logPrintf("minChainLength = %d\n", s.minChainLength);
+    logPrintf("maxTrials = %d\n", s.maxTrials);
+    logPrintf("boxSize = (%lg x %lg x %lg)\n", s.boxSize[0], s.boxSize[1], s.boxSize[2]);
+    logPrintf("targetMassDensity = %lg\n", s.targetMassDensity);
+    logPrintf("minDist = %lg\n", s.minDist);
+    logPrintf("polymer = %s\n", s.polymer.c_str());
+
+    logPrintf("\nFLAGS:\n");
+    logPrintf("roundRobin = %s\n", s.roundRobin?"true":"false");
+    logPrintf("logProgress = %s\n", s.logProgress?"true":"false");
+    logPrintf("logSteps = %s\n", s.logSteps?"true":"false");
+
+    logPrintf("\nCONSTRAINTS:\n");
+    logPrintf("graftedSeeds = %s\n", s.graftedSeeds?"true":"false");
+    logPrintf("growthBias = (%lg x %lg x %lg)\n", s.growthBias[0], s.growthBias[1], s.growthBias[2]);
+
     if (s.initiateChain()) // try initiating chains, if successful move on to next step
         while (s.actualCount() < s.targetCount()) // if total number of united atoms is less than the target
             if (!s.propagateChain()) break; // propagate the chain, unless it fails
     s.terminateChain(); // terminate the chains by changing the type of the last unitedAtom
 
-    printf("\n===Exporting Files===\n");
     s.calcAnglesDihedrals();
     s.exportLAMMPS();
     s.report();
@@ -24,11 +58,31 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-vector3<> randomUnitStep()
+InitParams SARW::initialize(int argc, char** argv, const char* description)
+{   InitParams ip;
+    ip.packageName = PACKAGE_NAME;
+    ip.versionString = VERSION_STRING;
+    ip.versionHash = GIT_HASH;
+    ip.description = description;
+    initSystemCmdline(argc, argv, ip);
+    // fftw_mpi_init();
+    return ip;
+}
+
+vector3<> SARW::randomUnitStep()
 {
-    vector3<> step(Random::uniform(-1,1), Random::uniform(-1,1), Random::uniform(-1,1));
-    step = normalize(step);
-    return step;
+    vector3<> step(Random::uniform(-.5,.5), Random::uniform(-.5,.5), Random::uniform(-.5,.5));
+
+    if (growthBias[0]==1) step[0] = Random::uniform(0,1);
+    else if (growthBias[0]==-1) step[0] = Random::uniform(-1,0);
+
+    if (growthBias[1]==1) step[1] = Random::uniform(0,1);
+    else if (growthBias[1]==-1) step[1] = Random::uniform(-1,0);
+
+    if (growthBias[2]==1) step[2] = Random::uniform(0,1);
+    else if (growthBias[2]==-1) step[2] = Random::uniform(-1,0);
+    
+    return normalize(step);
 }
 
 vector3<> randomConePos(const std::vector<unitedAtom> polymerChains, const int lastIndex, const int penultimateIndex, const double distance)
@@ -68,7 +122,7 @@ bool SARW::checkCollision(const std::vector<unitedAtom> newChainLinks, const int
     newChainSize = newChainLinks.size();
 
     double zMin = 0.;
-    for (vector3<> g : grafts) zMin = zMin < g.z() ? g.z() : zMin;
+    for (vector3<> g : listGrafts) zMin = zMin < g.z() ? g.z() : zMin;
 
     for (int i = 0; i < chainSize; ++i)
     {
@@ -78,7 +132,10 @@ bool SARW::checkCollision(const std::vector<unitedAtom> newChainLinks, const int
             vector3<> dist = (polymerChains[i].pos - newChainLinks[j].pos);
             for (int k = 0; k < 3; ++k) // minimum image convention
                 dist[k] -= boxSize[k] * nearbyint(dist[k] / boxSize[k]);
-            if ((dist.length() < minDist) || (newChainLinks[j].pos[0] < 0) || (newChainLinks[j].pos[1] < 0) || (newChainLinks[j].pos[2] < zMin))
+            if ((dist.length() < minDist) || 
+                (newChainLinks[j].pos[0] < 0)    || (newChainLinks[j].pos[0] > boxSize[0]) ||
+                (newChainLinks[j].pos[1] < 0)    || (newChainLinks[j].pos[1] > boxSize[1]) ||
+                (newChainLinks[j].pos[2] < polymerChains[i].pos[2]) || (newChainLinks[j].pos[2] > boxSize[2]))
                 return true;
         }
     }
@@ -91,7 +148,7 @@ bool SARW::checkCollision(const std::vector<unitedAtom> newChainLinks, const int
  */
 bool SARW::propagateChain()
 {
-    if (DEBUG) printf("DEBUG:: Entered Propagation step\n");
+    if (logSteps) logPrintf("Entered Propagation step\n");
     // propagate all chains, if possible
     // udpate indices and lengths
     int iChain, lastIndex, penultimateIndex;
@@ -101,7 +158,7 @@ bool SARW::propagateChain()
     
     for (int i = 0; i < nChains; ++i)
     {
-        if (ROUND_ROBIN) iChain = i;
+        if (roundRobin) iChain = i;
         else iChain = nearbyint(Random::uniform(0, nChains-1));
 
         lastIndex = lastIndices[iChain];
@@ -125,11 +182,11 @@ bool SARW::propagateChain()
         }
         flag = flag && (iTrial-1 >= maxTrials); // TODO: recheck the logic
 
-        if (DEBUG) printf("DEBUG:: iTrial %d\n", iTrial);
+        if (logSteps) logPrintf("iTrial %d\n", iTrial);
         if (iTrial-1 < maxTrials)
         {
-            if (DEBUG) printf("DEBUG:: Propagated %dth chain at %d\n", i, actualCount());
-            if (LOG) printf("LOG:: Progress = %d\n", 100*actualCount()/targetCount());
+            if (logSteps) logPrintf("Propagated %dth chain at %d\n", i, actualCount());
+            if (logProgress) logPrintf("Progress = %d\n", 100*actualCount()/targetCount());
         }
     }
     return !flag;
@@ -147,13 +204,16 @@ Input
 bool SARW::initiateChain()
 {
     // Store graft locations in matrix
-    std::ifstream graft_pos("graft.dat");
-    float x,y,z;
-    while (graft_pos >> x >> y >> z) {
-        grafts.push_back(vector3<>(x,y,z));
+    if (graftedSeeds)
+    {
+        std::ifstream graft_pos("graft.dat");
+        float x,y,z;
+        while (graft_pos >> x >> y >> z) {
+            listGrafts.push_back(vector3<>(x,y,z));
+        }
     }
     
-    if (DEBUG) printf("DEBUG:: Entered Initiation step\n");
+    if (logSteps) printf("Entered Initiation step\n");
 
     std::vector<unitedAtom> newChainLinks(2, unitedAtom());
 
@@ -172,12 +232,12 @@ bool SARW::initiateChain()
             // update listBond, index starts from 1
             listBonds.push_back(Bond(1, penultimateIndices[iChain]+1, lastIndices[iChain]+1));
             chainLengths[iChain] += 2;
-            if (DEBUG) printf("DEBUG:: Initiated %dth seed\n", iChain);
+            if (logSteps) printf("Initiated %dth seed\n", iChain);
         }
         else
             return false;
     }
-    if (DEBUG) printf("DEBUG:: Initiated %d seeds\n", nChains);
+    if (logSteps) printf("Initiated %d seeds\n", nChains);
 
     return true;
 }
@@ -198,7 +258,7 @@ bool SARW::randomSeed(std::vector<unitedAtom>& newChainLinks, const int iChain)
     while (iTrial++ < maxTrials)
     {
         if (iChain < nGrafts()) // if atom is grafted, seed from here
-            pos0 = vector3<>(grafts[iChain][0], grafts[iChain][1], grafts[iChain][2]);
+            pos0 = vector3<>(listGrafts[iChain][0], listGrafts[iChain][1], listGrafts[iChain][2]);
         else // if atom is not grafted, seed randomly
         {
             pos0 = vector3<>(
@@ -219,11 +279,11 @@ bool SARW::randomSeed(std::vector<unitedAtom>& newChainLinks, const int iChain)
 
 void SARW::terminateChain()
 {
-    if (DEBUG) printf("DEBUG:: Terminated!! at %d\n", actualCount());
+    if (logSteps) printf("Terminated!! at %d\n", actualCount());
     for (int i = 0; i < nChains; ++i)
     {
         polymerChains[lastIndices[i]].type = 1;
-        if (DEBUG) printf("Terminated chain # %d\n", i+1);
+        if (logSteps) printf("Terminated chain # %d\n", i+1);
     }
 }
 
@@ -240,13 +300,13 @@ void SARW::exportXYZ() const
 
 void SARW::exportXSF() const
 {
-    printf("Exporting XSF file: polymer.xsf\n");
+    logPrintf("Exporting XSF file: polymer.xsf\n");
     FILE* fp = fopen("polymer.xsf", "w");
     fprintf(fp, "CRYSTAL\nPRIMVEC\n");
-    fprintf(fp, "%d.0\t0.0\t0.0\n0.0\t%d.0\t0.0\n0.0\t0.0\t%d.0\n", boxSize[0], boxSize[1], boxSize[2]);
+    fprintf(fp, "%lf\t0.0\t0.0\n0.0\t%lf\t0.0\n0.0\t0.0\t%lf\n", boxSize[0], boxSize[1], boxSize[2]);
 
     fprintf(fp, "CONVVEC\n");
-    fprintf(fp, "%d.0\t0.0\t0.0\n0.0\t%d.0\t0.0\n0.0\t0.0\t%d.0\n", boxSize[0], boxSize[1], boxSize[2]);
+    fprintf(fp, "%lf\t0.0\t0.0\n0.0\t%lf\t0.0\n0.0\t0.0\t%lf\n", boxSize[0], boxSize[1], boxSize[2]);
 
     fprintf(fp, "PRIMCOORD\n%d\t%d\n", actualCount(), 1);
     for (unitedAtom atom : polymerChains)
@@ -286,20 +346,12 @@ Export DAT file for LAMMPS input
 */
 void SARW::exportLAMMPS() const
 {
-    printf("Exporting LAMMPS data file: polymer.dat\n");
+    logPrintf("\nExporting LAMMPS data file: polymer.dat\n");
 
     // ------------ Counting impropers ----------------
 
     FILE* fp = fopen("polymer.dat", "w");
-    #ifdef POLYSTYRENE
-    fprintf(fp, "POLYSTYRENE CHAINS\n\n");
-    #endif
-    #ifdef POLYPROPYLENE
-    fprintf(fp, "POLYPROPYLENE CHAINS\n\n");
-    #endif
-    #ifdef POLYETHYLENE
-    fprintf(fp, "POLYETHYLENE CHAINS\n\n");
-    #endif
+    fprintf(fp, "%s chains\n\n", polymer.c_str());
 
     fprintf(fp, "%5d\tatoms\n", actualCount());
     fprintf(fp, "%5d\tbonds\n", nBonds());
@@ -313,9 +365,9 @@ void SARW::exportLAMMPS() const
     fprintf(fp, "1\tdihedral types\n");
     // fprintf(fp, "1\timproper types\n");
     fprintf(fp, "\n");
-    fprintf(fp, "0.0 %d xlo xhi\n", boxSize[0]);
-    fprintf(fp, "0.0 %d ylo yhi\n", boxSize[1]);
-    fprintf(fp, "0.0 %d zlo zhi\n", boxSize[2]);
+    fprintf(fp, "0.0 %lf xlo xhi\n", boxSize[0]);
+    fprintf(fp, "0.0 %lf ylo yhi\n", boxSize[1]);
+    fprintf(fp, "0.0 %lf zlo zhi\n", boxSize[2]);
     fprintf(fp, "\n");
 
     fprintf(fp, "Masses\n\n");
@@ -363,24 +415,29 @@ void SARW::exportLAMMPS() const
 
 void SARW::report() const
 {
-    printf("\n===Report===\n");
+    logPrintf("\nSUMMARY:\n");
+        
+    logPrintf("No. of united atoms: ");
+    logPrintf("desired = %d, ", targetCount());
+    logPrintf("actual = %d\n", actualCount());
     
-    printf("\nBoxSize\t: %d x %d x %d\n", boxSize[0], boxSize[1], boxSize[2]);
-    
-    printf("\nnUnitedAtoms::\n");
-    printf("Desired\t: %d\n", targetCount());
-    printf("Actual\t: %d\n", actualCount());
-    
-    printf("\nNumber Density::\n");
-    printf("Desired\t: %.3e\n", targetNumberDensity());
-    printf("Actual\t: %.3e\n", actualNumberDensity());
+    logPrintf("Number density: ");
+    logPrintf("desired = %.3e, ", targetNumberDensity());
+    logPrintf("actual = %.3e\n", actualNumberDensity());
 
-    printf("\nMass Density::\n");
-    printf("Desired\t: %.2f\n", targetMassDensity);
-    printf("Actual\t: %.2f\n", actualMassDensity() );
+    logPrintf("Mass density: ");
+    logPrintf("desired = %.2f, ", targetMassDensity);
+    logPrintf("actual = %.2f\n", actualMassDensity() );
 
-    printf("Exporting distribution of chain lengths: chains.dat\n");
+    logPrintf("\nExporting distribution of chain lengths: chains.dat\n");
     FILE* fp = fopen("chains.dat", "w");
     for (int i : chainLengths) fprintf(fp, "%d\n", i);
     fclose(fp);
+}
+
+void SARW::setLogFlags(string logProgressFlag, string logStepsFlag)
+{
+    logProgress = logProgressFlag=="yes";
+    logSteps = logStepsFlag=="yes";
+    if (logSteps) logProgress=true;
 }

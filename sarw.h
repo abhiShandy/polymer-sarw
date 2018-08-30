@@ -1,16 +1,10 @@
 #ifndef SARW_H
 #define SARW_H
 
-//#define POLYSTYRENE
-//#define POLYPROPYLENE
-#define POLYETHYLENE
-#define DEBUG false
-#define LOG true
-#define ROUND_ROBIN true
 #define Avogadro 6.022e23
 
-#include <core/Random.h>
 #include <core/vector3.h>
+#include <core/Util.h>
 
 /////////////////////// GLOBAL VARIABLES & STRUCTS /////////////////////
 const char species[6][10] = {"", "CH3", "CH2", "CH", "CH_aro", "C_aro"};
@@ -82,21 +76,26 @@ public:
   int nChains;
   int minChainLength;
   double targetMassDensity;
-  vector3<int> boxSize;
+  vector3<> boxSize;
   double minDist;
   int maxTrials;
+  bool roundRobin;
+  bool logProgress, logSteps;
+  bool graftedSeeds;
+  string polymer;
+  vector3<> growthBias;
 
   std::vector<Bond> listBonds;
   std::vector<Angle> listAngles;
   std::vector<Dihedral> listDihedrals;
-  std::vector<vector3<>> grafts;
+  std::vector<vector3<>> listGrafts;
   std::vector<unitedAtom> polymerChains; // contains all finalised united atoms
   std::vector<int> lastIndices; // index of last united atom of each chain in polymerChains[]
   std::vector<int> penultimateIndices; // index of penulutimate united atom of each chain in polymerChains[]
   std::vector<int> chainLengths; // length of each polymer chain
   
   // #### Constructor ####
-  SARW() : nChains(1), minChainLength(10), targetMassDensity(0.92), boxSize(vector3<int>(10,10,10)), minDist(2.0), maxTrials(100)
+  SARW(int nChains): nChains(nChains)
   {
     lastIndices.resize(nChains);
     penultimateIndices.resize(nChains);
@@ -108,7 +107,7 @@ public:
   int nBonds() const {return (int)listBonds.size();}
   int nAngles() const {return (int)listAngles.size();}
   int nDihedrals() const {return (int)listDihedrals.size();}
-  int nGrafts() const {return (int)grafts.size();}
+  int nGrafts() const {return (int)listGrafts.size();}
   int targetCount() const { return nChains * minChainLength; }
   int actualCount() const { return polymerChains.size(); }
   int vol() const { return boxSize[0]*boxSize[1]*boxSize[2]; }
@@ -128,11 +127,15 @@ public:
   void terminateChain();
   bool randomSeed(std::vector<unitedAtom>& newChainLinks, const int iChain);
   bool checkCollision(const std::vector<unitedAtom>, const int ignoreIndex = -1);
+
+  static InitParams initialize(int argc, char** argv, const char* description); //!< wrap initSystemCmdLine from JDFTx
+  void setLogFlags(string logProgressFlag, string logStepsFlag);
+  vector3<> randomUnitStep();
+
 };
 
 
 //////////////////////////////////// helper functions /////////////////////////////////////
-vector3<> randomUnitStep();
 vector3<> randomConePos(const std::vector<unitedAtom>, const int, const int, const double);
 
 #endif // SARW_H

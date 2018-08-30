@@ -31,11 +31,19 @@ if(GIT_FOUND)
 	endif()
 endif()
 
+#Whether MPI is on or off should match the corresponding JDFTx build:
+option(EnableMPI "Use MPI parallelization (in addition to threads / gpu)" ON)
+if(EnableMPI)
+	find_package(MPI REQUIRED)
+	include_directories(${MPI_INCLUDE_PATH})
+	add_definitions("-DMPI_ENABLED")
+endif()
+
 configure_file(${CMAKE_SOURCE_DIR}/config.in.h ${CMAKE_BINARY_DIR}/config.h)
 include_directories("${JDFTX_SRC}")
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_BINARY_DIR})
-add_definitions(-Wall -g -O3 -std=c++0x)
+add_definitions(-Wall -g -O3 -std=c++0x ${MPI_CXX_COMPILE_FLAGS})
 
 #Profiling (optional):
 option(EnableProfiling "Optionally enable profiling to determine ideal functions to optimize (for developers)")
