@@ -77,11 +77,13 @@ public:
   int minChainLength;
   double targetMassDensity;
   vector3<> boxSize;
+  string boundary;
   double minDist;
   int maxTrials;
   bool roundRobin;
   bool logProgress, logSteps;
-  bool graftedSeeds;
+  string graftedSeeds;
+  double graftFraction;
   string polymer;
   vector3<> growthBias;
 

@@ -21,12 +21,14 @@ int main(int argc, char **argv)
     s.boxSize = inputMap.getVector("boxSize", vector3<>(10,10,10));
     s.maxTrials = inputMap.get("maxTrials", 100);
     s.targetMassDensity = inputMap.get("targetMassDensity", 0.92);
-    s.minDist = inputMap.get("minDist", 2.0);
+    s.minDist = inputMap.get("minDist", 0.2);
     s.roundRobin = inputMap.getString("roundRobin")=="yes";
     s.polymer = inputMap.getString("polymer");
     s.setLogFlags(inputMap.getString("logProgress"), inputMap.getString("logSteps"));
-    s.graftedSeeds = inputMap.getString("graftedSeeds")=="yes";
+    s.graftedSeeds = inputMap.getString("graftedSeeds");
+    s.graftFraction = inputMap.get("graftFraction", 0.);
     s.growthBias = inputMap.getVector("growthBias", vector3<>(0,0,0));
+    s.boundary = inputMap.getString("boundary");
 
     logPrintf("\nINPUTS:\n");
     logPrintf("nChains = %d\n", s.nChains);
@@ -43,13 +45,18 @@ int main(int argc, char **argv)
     logPrintf("logSteps = %s\n", s.logSteps?"true":"false");
 
     logPrintf("\nCONSTRAINTS:\n");
-    logPrintf("graftedSeeds = %s\n", s.graftedSeeds?"true":"false");
+    logPrintf("graftedSeeds = %s\n", s.graftedSeeds.c_str());
     logPrintf("growthBias = (%lg x %lg x %lg)\n", s.growthBias[0], s.growthBias[1], s.growthBias[2]);
 
+    if (s.logProgress) logPrintf("\nPROGRESS: ");
     if (s.initiateChain()) // try initiating chains, if successful move on to next step
         while (s.actualCount() < s.targetCount()) // if total number of united atoms is less than the target
+        {
             if (!s.propagateChain()) break; // propagate the chain, unless it fails
+            if (s.logProgress) logPrintf("%d, ", 100*s.actualCount()/s.targetCount());
+        }
     s.terminateChain(); // terminate the chains by changing the type of the last unitedAtom
+    if (s.logProgress) logPrintf("\n");
 
     s.calcAnglesDihedrals();
     s.exportLAMMPS();
@@ -117,6 +124,7 @@ Check Collision of a potential section of chain
 bool SARW::checkCollision(const std::vector<unitedAtom> newChainLinks, const int ignoreIndex)
 {
     int newChainSize, chainSize;
+    bool collisionFlag;
 
     chainSize    = actualCount();
     newChainSize = newChainLinks.size();
@@ -132,11 +140,12 @@ bool SARW::checkCollision(const std::vector<unitedAtom> newChainLinks, const int
             vector3<> dist = (polymerChains[i].pos - newChainLinks[j].pos);
             for (int k = 0; k < 3; ++k) // minimum image convention
                 dist[k] -= boxSize[k] * nearbyint(dist[k] / boxSize[k]);
-            if ((dist.length() < minDist) || 
-                (newChainLinks[j].pos[0] < 0)    || (newChainLinks[j].pos[0] > boxSize[0]) ||
-                (newChainLinks[j].pos[1] < 0)    || (newChainLinks[j].pos[1] > boxSize[1]) ||
-                (newChainLinks[j].pos[2] < polymerChains[i].pos[2]) || (newChainLinks[j].pos[2] > boxSize[2]))
-                return true;
+
+            collisionFlag = (dist.length() < minDist);
+            collisionFlag = collisionFlag || ((boundary=="fixed") && ((newChainLinks[j].pos[0]<0) || (newChainLinks[j].pos[0]>boxSize[0])));
+            collisionFlag = collisionFlag || ((boundary=="fixed") && ((newChainLinks[j].pos[1]<0) || (newChainLinks[j].pos[1]>boxSize[1])));
+            collisionFlag = collisionFlag || ((boundary=="fixed") && ((newChainLinks[j].pos[2]<0) || (newChainLinks[j].pos[2]>boxSize[2])));
+            return collisionFlag;
         }
     }
     return false;
@@ -183,11 +192,7 @@ bool SARW::propagateChain()
         flag = flag && (iTrial-1 >= maxTrials); // TODO: recheck the logic
 
         if (logSteps) logPrintf("iTrial %d\n", iTrial);
-        if (iTrial-1 < maxTrials)
-        {
-            if (logSteps) logPrintf("Propagated %dth chain at %d\n", i, actualCount());
-            if (logProgress) logPrintf("Progress = %d\n", 100*actualCount()/targetCount());
-        }
+        if ((iTrial-1 < maxTrials) && logSteps) logPrintf("Propagated %dth chain at %d\n", i, actualCount());
     }
     return !flag;
 }
@@ -204,7 +209,7 @@ Input
 bool SARW::initiateChain()
 {
     // Store graft locations in matrix
-    if (graftedSeeds)
+    if (graftedSeeds=="file")
     {
         std::ifstream graft_pos("graft.dat");
         float x,y,z;
@@ -260,11 +265,15 @@ bool SARW::randomSeed(std::vector<unitedAtom>& newChainLinks, const int iChain)
         if (iChain < nGrafts()) // if atom is grafted, seed from here
             pos0 = vector3<>(listGrafts[iChain][0], listGrafts[iChain][1], listGrafts[iChain][2]);
         else // if atom is not grafted, seed randomly
-        {
-            pos0 = vector3<>(
+        {   pos0 = vector3<>(
                 Random::uniform(0, boxSize[0]),
                 Random::uniform(0, boxSize[1]),
                 Random::uniform(0, boxSize[2]));
+        }
+        if (iChain < nChains*graftFraction)
+        {   if (graftedSeeds == "x") pos0[0]=0.;
+            if (graftedSeeds == "y") pos0[1]=0.;
+            if (graftedSeeds == "z") pos0[2]=0.;
         }
 
         // CH atom at a random position on a sphere around the CH3 seed
