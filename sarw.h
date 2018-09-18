@@ -113,7 +113,7 @@ public:
   int targetCount() const { return nChains * minChainLength; }
   int actualCount() const { return polymerChains.size(); }
   int vol() const { return boxSize[0]*boxSize[1]*boxSize[2]; }
-  double actualMassDensity()  const { return ( 14.0*actualCount() )/(Avogadro * vol() * 1e-24); }
+  double actualMassDensity()  const { return ( 14.0*actualCount()+2.0*nChains)/(Avogadro * vol() * 1e-24); }
   double targetNumberDensity()  const { return Avogadro * targetMassDensity /14.0; }
   double actualNumberDensity()  const { return Avogadro * actualMassDensity() /14.0; }
   
@@ -133,11 +133,8 @@ public:
   static InitParams initialize(int argc, char** argv, const char* description); //!< wrap initSystemCmdLine from JDFTx
   void setLogFlags(string logProgressFlag, string logStepsFlag);
   vector3<> randomUnitStep();
+  vector3<> randomConePos(const int, const int, const double);
 
 };
-
-
-//////////////////////////////////// helper functions /////////////////////////////////////
-vector3<> randomConePos(const std::vector<unitedAtom>, const int, const int, const double);
 
 #endif // SARW_H

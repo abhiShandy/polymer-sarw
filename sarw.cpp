@@ -2,6 +2,7 @@
 *   Developed by Abhishek Shandilya
 */
 
+#include <cmath>
 #include <iostream>
 #include <fstream>
 #include <core/Random.h>
@@ -21,7 +22,7 @@ int main(int argc, char **argv)
     s.boxSize = inputMap.getVector("boxSize", vector3<>(10,10,10));
     s.maxTrials = inputMap.get("maxTrials", 100);
     s.targetMassDensity = inputMap.get("targetMassDensity", 0.92);
-    s.minDist = inputMap.get("minDist", 0.2);
+    s.minDist = inputMap.get("minDist", 2.0);
     s.roundRobin = inputMap.getString("roundRobin")=="yes";
     s.polymer = inputMap.getString("polymer");
     s.setLogFlags(inputMap.getString("logProgress"), inputMap.getString("logSteps"));
@@ -47,6 +48,7 @@ int main(int argc, char **argv)
     logPrintf("\nCONSTRAINTS:\n");
     logPrintf("graftedSeeds = %s\n", s.graftedSeeds.c_str());
     logPrintf("growthBias = (%lg x %lg x %lg)\n", s.growthBias[0], s.growthBias[1], s.growthBias[2]);
+    logPrintf("boundary = %s\n", s.boundary.c_str());
 
     if (s.logProgress) logPrintf("\nPROGRESS: ");
     if (s.initiateChain()) // try initiating chains, if successful move on to next step
@@ -60,6 +62,8 @@ int main(int argc, char **argv)
 
     s.calcAnglesDihedrals();
     s.exportLAMMPS();
+    s.exportXYZ();
+    s.exportXSF();
     s.report();
 
     return 0;
@@ -92,7 +96,12 @@ vector3<> SARW::randomUnitStep()
     return normalize(step);
 }
 
-vector3<> randomConePos(const std::vector<unitedAtom> polymerChains, const int lastIndex, const int penultimateIndex, const double distance)
+/*
+ * Generate a random point on a Cone of Tetrahedral head angle given the following inputs:
+ * - lastIndex, penultimateIndex : indices of unitedAtoms to form the axis of the cone
+ * - distance: distance along the cone's surface (bond length between the last unitedAtom and the newly created one)
+ */
+vector3<> SARW::randomConePos(const int lastIndex, const int penultimateIndex, const double distance)
 {
     double theta, phi;
     vector3<> localX, localY, localZ, newPos;
@@ -106,12 +115,20 @@ vector3<> randomConePos(const std::vector<unitedAtom> polymerChains, const int l
     else                    localX = vector3<>(0,1,0) - localZ * localZ.y();
     localX = normalize(localX);
     localY = normalize(cross(localZ, localX));
+  
+    while(true)
+    {
+      theta = Random::uniform(0, 359)*M_PI/180;
 
-    theta = Random::uniform(0, 359)*M_PI/180;
-
-    newPos = distance*sin(phi)*cos(theta)*localX
-           + distance*sin(phi)*sin(theta)*localY
-           + distance*cos(phi)           *localZ;
+      newPos = distance*sin(phi)*cos(theta)*localX
+	     + distance*sin(phi)*sin(theta)*localY
+	     + distance*cos(phi)           *localZ;
+      if (growthBias[0] && newPos[0]>0) break;
+      if (growthBias[1] && newPos[1]>0) break;
+      if (growthBias[2] && newPos[2]>0) break;
+      if (!(growthBias[0]+growthBias[1]+growthBias[2])) break;
+    }
+    
     newPos += polymerChains[lastIndex].pos;
     return newPos;
 }
@@ -123,15 +140,10 @@ Check Collision of a potential section of chain
 */
 bool SARW::checkCollision(const std::vector<unitedAtom> newChainLinks, const int ignoreIndex)
 {
-    int newChainSize, chainSize;
-    bool collisionFlag;
+    int chainSize    = actualCount();
+    int newChainSize = newChainLinks.size();
 
-    chainSize    = actualCount();
-    newChainSize = newChainLinks.size();
-
-    double zMin = 0.;
-    for (vector3<> g : listGrafts) zMin = zMin < g.z() ? g.z() : zMin;
-
+    // Check for collisions
     for (int i = 0; i < chainSize; ++i)
     {
         if (ignoreIndex >= 0 && i==ignoreIndex) continue;
@@ -139,14 +151,20 @@ bool SARW::checkCollision(const std::vector<unitedAtom> newChainLinks, const int
         {
             vector3<> dist = (polymerChains[i].pos - newChainLinks[j].pos);
             for (int k = 0; k < 3; ++k) // minimum image convention
-                dist[k] -= boxSize[k] * nearbyint(dist[k] / boxSize[k]);
+	      dist[k] -= boxSize[k] * nearbyint(dist[k] / boxSize[k]);
 
-            collisionFlag = (dist.length() < minDist);
-            collisionFlag = collisionFlag || ((boundary=="fixed") && ((newChainLinks[j].pos[0]<0) || (newChainLinks[j].pos[0]>boxSize[0])));
-            collisionFlag = collisionFlag || ((boundary=="fixed") && ((newChainLinks[j].pos[1]<0) || (newChainLinks[j].pos[1]>boxSize[1])));
-            collisionFlag = collisionFlag || ((boundary=="fixed") && ((newChainLinks[j].pos[2]<0) || (newChainLinks[j].pos[2]>boxSize[2])));
-            return collisionFlag;
+            bool collisionFlag = (dist.length() < minDist);
+            if (collisionFlag) return true;
         }
+    }
+    
+    // Fixed boundary condtions:
+    for (int j = 0; j < newChainSize; ++j)
+    {
+	bool collisionFlag = ((boundary=="ppf") && ((newChainLinks[j].pos[2]<0) || (newChainLinks[j].pos[2]>boxSize[2])));
+	collisionFlag = collisionFlag || ((boundary=="pfp") && ((newChainLinks[j].pos[1]<0) || (newChainLinks[j].pos[1]>boxSize[1])));
+	collisionFlag = collisionFlag || ((boundary=="fpp") && ((newChainLinks[j].pos[0]<0) || (newChainLinks[j].pos[0]>boxSize[0])));
+	if (collisionFlag) return true;
     }
     return false;
 }
@@ -177,7 +195,7 @@ bool SARW::propagateChain()
         while (iTrial++ < maxTrials)
         {
             // avoid hard-coding any number
-            newCH2[0] = unitedAtom(2, iChain+1, randomConePos(polymerChains, lastIndex, penultimateIndex, bondLengths[0]));
+            newCH2[0] = unitedAtom(2, iChain+1, randomConePos(lastIndex, penultimateIndex, bondLengths[0]));
             if (checkCollision(newCH2, lastIndex)) continue;
             
             polymerChains.push_back(newCH2[0]);
@@ -211,8 +229,9 @@ bool SARW::initiateChain()
     // Store graft locations in matrix
     if (graftedSeeds=="file")
     {
+	logPrintf("Reading graft.dat\n");
         std::ifstream graft_pos("graft.dat");
-        float x,y,z;
+        double x,y,z;
         while (graft_pos >> x >> y >> z) {
             listGrafts.push_back(vector3<>(x,y,z));
         }
@@ -237,12 +256,12 @@ bool SARW::initiateChain()
             // update listBond, index starts from 1
             listBonds.push_back(Bond(1, penultimateIndices[iChain]+1, lastIndices[iChain]+1));
             chainLengths[iChain] += 2;
-            if (logSteps) printf("Initiated %dth seed\n", iChain);
+            if (logSteps) logPrintf("Initiated %dth seed\n", iChain);
         }
         else
             return false;
     }
-    if (logSteps) printf("Initiated %d seeds\n", nChains);
+    if (logSteps) logPrintf("Initiated %d seeds\n", nChains);
 
     return true;
 }
@@ -298,12 +317,12 @@ void SARW::terminateChain()
 
 void SARW::exportXYZ() const
 {
-    printf("Exporting XYZ file: polymer.xyz\n");
+    logPrintf("Exporting XYZ file: polymer.xyz\n");
     FILE* fp = fopen("polymer.xyz", "w");
     fprintf(fp, "%d\n", actualCount());
     fprintf(fp, "POLYSTYRENE\n");
     for (unitedAtom atom : polymerChains)
-        fprintf(fp, "%d\t%lf\t%lf\t%lf\n", atom.type, atom.pos[0], atom.pos[1], atom.pos[2]);
+        fprintf(fp, "C\t%lf\t%lf\t%lf\n", atom.pos[0], atom.pos[1], atom.pos[2]);
     fclose(fp);
 }
 
@@ -387,7 +406,8 @@ void SARW::exportLAMMPS() const
     fprintf(fp, "Atoms\n\n");
     int i = 0;
     for (unitedAtom ua : polymerChains)
-        fprintf(fp, "%d\t%d\t%d\t%lf\t%lf\t%lf\n", ++i, ua.chainID, ua.type, ua.pos[0], ua.pos[1], ua.pos[2]);
+        fprintf(fp, "%d\t%d\t%d\t%lf\t%lf\t%lf\t%d %d %d\n", ++i, ua.chainID, ua.type, ua.pos[0], ua.pos[1], ua.pos[2], 
+		(int)(ua.pos[0]/boxSize[0]), (int)(ua.pos[1]/boxSize[1]), (int)(ua.pos[2]/boxSize[2]));
     fprintf(fp, "\n");
 
     fprintf(fp, "Bonds\n\n");
@@ -436,7 +456,7 @@ void SARW::report() const
 
     logPrintf("Mass density: ");
     logPrintf("desired = %.2f, ", targetMassDensity);
-    logPrintf("actual = %.2f\n", actualMassDensity() );
+    logPrintf("actual = %.2f\n", actualMassDensity());
 
     logPrintf("\nExporting distribution of chain lengths: chains.dat\n");
     FILE* fp = fopen("chains.dat", "w");
