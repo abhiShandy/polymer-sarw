@@ -74,7 +74,8 @@ class SARW
 public:
   // #### Member Variables ####
   int nChains;
-  int minChainLength;
+  int maxAtoms;
+  //int minChainLength;
   double targetMassDensity;
   vector3<> boxSize;
   string boundary;
@@ -110,7 +111,7 @@ public:
   int nAngles() const {return (int)listAngles.size();}
   int nDihedrals() const {return (int)listDihedrals.size();}
   int nGrafts() const {return (int)listGrafts.size();}
-  int targetCount() const { return nChains * minChainLength; }
+  int targetCount() const { return nChains * maxAtoms; }
   int actualCount() const { return polymerChains.size(); }
   int vol() const { return boxSize[0]*boxSize[1]*boxSize[2]; }
   double actualMassDensity()  const { return ( 14.0*actualCount()+2.0*nChains)/(Avogadro * vol() * 1e-24); }
@@ -134,6 +135,7 @@ public:
   void setLogFlags(string logProgressFlag, string logStepsFlag);
   vector3<> randomUnitStep();
   vector3<> randomConePos(const int, const int, const double);
+  void setMaxAtoms();
 
 };
 
