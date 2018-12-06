@@ -17,13 +17,12 @@ int main(int argc, char **argv)
 
 	// set parameters from input file
 	int nChains = inputMap.get("nChains", 1);
-	SARW s = SARW(nChains);
+	vector3<> boxSize = inputMap.getVector("boxSize", vector3<>(10,10,10));
+	double minDist = inputMap.get("minDist", 2.0);
+	SARW s = SARW(nChains, boxSize, minDist);
 	s.maxAtoms = inputMap.get("maxAtoms");
-	//s.minChainLength = inputMap.get("minChainLength", 2);
-	s.boxSize = inputMap.getVector("boxSize", vector3<>(10,10,10));
 	s.maxTrials = inputMap.get("maxTrials", 100);
 	s.targetMassDensity = inputMap.get("targetMassDensity", 0.92);
-	s.minDist = inputMap.get("minDist", 2.0);
 	s.roundRobin = inputMap.getString("roundRobin")=="yes";
 	s.polymer = inputMap.getString("polymer");
 	s.setLogFlags(inputMap.getString("logProgress"), inputMap.getString("logSteps"));
@@ -57,21 +56,22 @@ int main(int argc, char **argv)
 	int oldProgress=0, currentProgress;
 	//if (s.minChainLength>=2)
 	//{
-		if (s.logProgress) logPrintf("\nPROGRESS: ");
-		if (s.initiateChain()) // try initiating chains, if successful move on to next step
-			while (s.actualCount() < s.targetCount()) // if total number of united atoms is less than the target
+	if (s.logProgress) logPrintf("\nPROGRESS: ");
+	if (s.initiateChain()) // try initiating chains, if successful move on to next step
+	{	while (s.actualCount() < s.targetCount()) // if total number of united atoms is less than the target
+		{
+			if (!s.propagateChain()) break; // propagate the chain, unless it fails
+			currentProgress = 100.*s.actualCount()/s.targetCount();
+			if (s.logProgress && (currentProgress > oldProgress))
 			{
-				if (!s.propagateChain()) break; // propagate the chain, unless it fails
-				currentProgress = 100.*s.actualCount()/s.targetCount();
-				if (s.logProgress && (currentProgress > oldProgress))
-				{
-					oldProgress = currentProgress;
-					logPrintf("%d, ", currentProgress);
-					fflush(globalLog);
-				}
+				oldProgress = currentProgress;
+				logPrintf("%d, ", currentProgress);
+				fflush(globalLog);
 			}
-		s.terminateChain(); // terminate the chains by changing the type of the last unitedAtom
-		if (s.logProgress) logPrintf("\n");
+		}
+	}
+	s.terminateChain(); // terminate the chains by changing the type of the last unitedAtom
+	if (s.logProgress) logPrintf("\n");
 	//}
 
 	s.calcAnglesDihedrals();
@@ -154,31 +154,18 @@ Check Collision of a potential section of chain
 */
 bool SARW::checkCollision(const std::vector<unitedAtom> newChainLinks, const int ignoreIndex)
 {
-	int chainSize    = actualCount();
-	int newChainSize = newChainLinks.size();
-
 	// Check for collisions
-	for (int i = 0; i < chainSize; ++i)
-	{
-		if (ignoreIndex >= 0 && i==ignoreIndex) continue;
-		for (int j = 0; j < newChainSize; ++j)
-		{
-			vector3<> dist = (polymerChains[i].pos - newChainLinks[j].pos);
-			for (int k = 0; k < 3; ++k) // minimum image convention
-		  dist[k] -= boxSize[k] * nearbyint(dist[k] / boxSize[k]);
-
-			bool collisionFlag = (dist.length() < minDist);
-			if (collisionFlag) return true;
-		}
-	}
+	for(const unitedAtom newAtom: newChainLinks)
+		if(plook.find(newAtom.pos, ignoreIndex))
+			return true;
 	
 	// Fixed boundary condtions:
-	for (int j = 0; j < newChainSize; ++j)
+	for(const unitedAtom newAtom: newChainLinks)
 	{
-	bool collisionFlag = ((boundary=="ppf") && ((newChainLinks[j].pos[2]<0) || (newChainLinks[j].pos[2]>boxSize[2])));
-	collisionFlag = collisionFlag || ((boundary=="pfp") && ((newChainLinks[j].pos[1]<0) || (newChainLinks[j].pos[1]>boxSize[1])));
-	collisionFlag = collisionFlag || ((boundary=="fpp") && ((newChainLinks[j].pos[0]<0) || (newChainLinks[j].pos[0]>boxSize[0])));
-	if (collisionFlag) return true;
+		bool collisionFlag = ((boundary=="ppf") && ((newAtom.pos[2]<0) || (newAtom.pos[2]>boxSize[2])));
+		collisionFlag = collisionFlag || ((boundary=="pfp") && ((newAtom.pos[1]<0) || (newAtom.pos[1]>boxSize[1])));
+		collisionFlag = collisionFlag || ((boundary=="fpp") && ((newAtom.pos[0]<0) || (newAtom.pos[0]>boxSize[0])));
+		if (collisionFlag) return true;
 	}
 	return false;
 }
@@ -212,7 +199,7 @@ bool SARW::propagateChain()
 			newCH2[0] = unitedAtom(2, iChain+1, randomConePos(lastIndex, penultimateIndex, bondLengths[0]));
 			if (checkCollision(newCH2, lastIndex)) continue;
 			
-			polymerChains.push_back(newCH2[0]);
+			addAtom(newCH2[0]);
 
 			penultimateIndices[iChain] = lastIndices[iChain];
 			lastIndices[iChain]        = actualCount() - 1;
@@ -262,8 +249,8 @@ bool SARW::initiateChain()
 		{
 			newChainLinks[0].chainID = iChain+1;
 			newChainLinks[1].chainID = iChain+1;
-			polymerChains.push_back(newChainLinks[0]);
-			polymerChains.push_back(newChainLinks[1]);
+			addAtom(newChainLinks[0]);
+			addAtom(newChainLinks[1]);
 			// update indices, index starts from 0
 			lastIndices[iChain] = actualCount() - 1;
 			penultimateIndices[iChain] = actualCount() - 2;

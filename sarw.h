@@ -5,6 +5,7 @@
 
 #include <core/vector3.h>
 #include <core/Util.h>
+#include <PeriodicLookup.h>
 
 /////////////////////// GLOBAL VARIABLES & STRUCTS /////////////////////
 const char species[6][10] = {"", "CH3", "CH2", "CH", "CH_aro", "C_aro"};
@@ -96,9 +97,11 @@ public:
   std::vector<int> lastIndices; // index of last united atom of each chain in polymerChains[]
   std::vector<int> penultimateIndices; // index of penulutimate united atom of each chain in polymerChains[]
   std::vector<int> chainLengths; // length of each polymer chain
+  PeriodicLookup plook;
   
   // #### Constructor ####
-  SARW(int nChains): nChains(nChains)
+  SARW(int nChains, vector3<> boxSize, double minDist)
+  : nChains(nChains), boxSize(boxSize), minDist(minDist), plook(boxSize, minDist)
   {
     lastIndices.resize(nChains);
     penultimateIndices.resize(nChains);
@@ -130,7 +133,13 @@ public:
   void terminateChain();
   bool randomSeed(std::vector<unitedAtom>& newChainLinks, const int iChain);
   bool checkCollision(const std::vector<unitedAtom>, const int ignoreIndex = -1);
-
+  
+  //Add atom to polymerChains and update plook accordingly
+  inline void addAtom(const unitedAtom& atom)
+  {  polymerChains.push_back(atom);
+     plook.addPoint(atom.pos); //update plook
+  }
+  
   static InitParams initialize(int argc, char** argv, const char* description); //!< wrap initSystemCmdLine from JDFTx
   void setLogFlags(string logProgressFlag, string logStepsFlag);
   vector3<> randomUnitStep();
