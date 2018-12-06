@@ -20,7 +20,7 @@ int main(int argc, char **argv)
 	vector3<> boxSize = inputMap.getVector("boxSize", vector3<>(10,10,10));
 	double minDist = inputMap.get("minDist", 2.0);
 	SARW s = SARW(nChains, boxSize, minDist);
-	s.maxAtoms = inputMap.get("maxAtoms");
+	s.maxAtoms = inputMap.get("maxAtoms", -1);
 	s.maxTrials = inputMap.get("maxTrials", 100);
 	s.targetMassDensity = inputMap.get("targetMassDensity", 0.92);
 	s.roundRobin = inputMap.getString("roundRobin")=="yes";
@@ -35,7 +35,6 @@ int main(int argc, char **argv)
 	logPrintf("\nINPUTS:\n");
 	logPrintf("nChains = %d\n", s.nChains);
 	logPrintf("maxAtoms = %d\n", s.maxAtoms);
-	//logPrintf("minChainLength = %d\n", s.minChainLength);
 	logPrintf("boxSize = (%lg x %lg x %lg)\n", s.boxSize[0], s.boxSize[1], s.boxSize[2]);
 	logPrintf("maxTrials = %d\n", s.maxTrials);
 	logPrintf("targetMassDensity = %lg\n", s.targetMassDensity);
@@ -54,8 +53,7 @@ int main(int argc, char **argv)
 	logPrintf("boundary = %s\n", s.boundary.c_str());
 
 	int oldProgress=0, currentProgress;
-	//if (s.minChainLength>=2)
-	//{
+
 	if (s.logProgress) logPrintf("\nPROGRESS: ");
 	if (s.initiateChain()) // try initiating chains, if successful move on to next step
 	{	while (s.actualCount() < s.targetCount()) // if total number of united atoms is less than the target
@@ -72,7 +70,6 @@ int main(int argc, char **argv)
 	}
 	s.terminateChain(); // terminate the chains by changing the type of the last unitedAtom
 	if (s.logProgress) logPrintf("\n");
-	//}
 
 	s.calcAnglesDihedrals();
 	s.exportLAMMPS();
@@ -90,7 +87,6 @@ InitParams SARW::initialize(int argc, char** argv, const char* description)
 	ip.versionHash = GIT_HASH;
 	ip.description = description;
 	initSystemCmdline(argc, argv, ip);
-	// fftw_mpi_init();
 	return ip;
 }
 
@@ -106,7 +102,7 @@ vector3<> SARW::randomUnitStep()
 
 	if (growthBias[2]==1) step[2] = Random::uniform(0,1);
 	else if (growthBias[2]==-1) step[2] = Random::uniform(-1,0);
-	
+
 	return normalize(step);
 }
 
@@ -129,18 +125,18 @@ vector3<> SARW::randomConePos(const int lastIndex, const int penultimateIndex, c
 	else                    localX = vector3<>(0,1,0) - localZ * localZ.y();
 	localX = normalize(localX);
 	localY = normalize(cross(localZ, localX));
-  
+
 	while(true)
 	{
-	  theta = Random::uniform(0, 359)*M_PI/180;
+		theta = Random::uniform(0, 359) * M_PI/180;
 
-	  newPos = distance*sin(phi)*cos(theta)*localX
-		 + distance*sin(phi)*sin(theta)*localY
-		 + distance*cos(phi)           *localZ;
-	  if (growthBias[0] && newPos[0]>0) break;
-	  if (growthBias[1] && newPos[1]>0) break;
-	  if (growthBias[2] && newPos[2]>0) break;
-	  if (!(growthBias[0]+growthBias[1]+growthBias[2])) break;
+		newPos = distance*sin(phi)*cos(theta)*localX
+			   + distance*sin(phi)*sin(theta)*localY
+			   + distance*cos(phi)			 *localZ;
+		if (growthBias[0] && newPos[0]>0) break;
+		if (growthBias[1] && newPos[1]>0) break;
+		if (growthBias[2] && newPos[2]>0) break;
+		if (!(growthBias[0]+growthBias[1]+growthBias[2])) break;
 	}
 	
 	newPos += polymerChains[lastIndex].pos;
