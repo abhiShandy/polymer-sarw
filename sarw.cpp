@@ -287,9 +287,16 @@ bool SARW::randomSeed(std::vector<unitedAtom>& newChainLinks, const int iChain)
 				Random::uniform(0, boxSize[2]));
 		}
 		if (iChain < nChains*graftFraction)
-		{   if (graftedSeeds == "x") pos0[0]=0.;
-			if (graftedSeeds == "y") pos0[1]=0.;
-			if (graftedSeeds == "z") pos0[2]=0.;
+		{
+			// Chains are grafted on a plane
+			if (graftedSeeds == "x") pos0[0]=0.;		// x=0
+			else if (graftedSeeds == "y") pos0[1]=0.;	// y=0
+			else if (graftedSeeds == "z") pos0[2]=0.;	// z=0
+			else if (graftedSeeds == "zz")				// z=0 & z=Lz
+			{
+				if (iChain%2) pos0[2]=0.;
+				else pos0[2] = boxSize[2]-.01;
+			}
 		}
 
 		// CH atom at a random position on a sphere around the CH3 seed
@@ -399,12 +406,12 @@ void SARW::exportLAMMPS() const
 	for (int i=0;i<2;i++) fprintf(fp, "%d\t%lf\n", i+1, atomMass[i]);
 	fprintf(fp, "\n");
 
-	// ========= Atoms ==============
 	fprintf(fp, "Atoms\n\n");
 	int i = 0;
 	for (unitedAtom ua : polymerChains)
-		fprintf(fp, "%d\t%d\t%d\t%lf\t%lf\t%lf\t%d %d %d\n", ++i, ua.chainID, ua.type, ua.pos[0], ua.pos[1], ua.pos[2], 
-		(int)(ua.pos[0]/boxSize[0]), (int)(ua.pos[1]/boxSize[1]), (int)(ua.pos[2]/boxSize[2]));
+		fprintf(fp, "%d\t%d\t%d\t%lf\t%lf\t%lf\n", ++i, ua.chainID, ua.type, ua.pos[0], ua.pos[1], ua.pos[2]);
+		// Image flags
+		//fprintf(fp, "%d %d %d\n", (int)(ua.pos[0]/boxSize[0]), (int)(ua.pos[1]/boxSize[1]), (int)(ua.pos[2]/boxSize[2]));
 	fprintf(fp, "\n");
 
 	fprintf(fp, "Bonds\n\n");
