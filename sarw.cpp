@@ -12,6 +12,9 @@
 
 int main(int argc, char **argv)
 {
+	// Use a different seed for Random number generator in every run
+	srand(time(NULL));
+
 	InitParams ip = SARW::initialize(argc, argv, "Self Avoiding Random Walk");
 	InputMap inputMap(ip.inputFilename);
 
@@ -92,6 +95,7 @@ InitParams SARW::initialize(int argc, char** argv, const char* description)
 
 vector3<> SARW::randomUnitStep()
 {
+        Random::seed(rand()%100);
 	vector3<> step(Random::uniform(-.5,.5), Random::uniform(-.5,.5), Random::uniform(-.5,.5));
 
 	if (growthBias[0]==1) step[0] = Random::uniform(0,1);
@@ -113,6 +117,7 @@ vector3<> SARW::randomUnitStep()
  */
 vector3<> SARW::randomConePos(const int lastIndex, const int penultimateIndex, const double distance)
 {
+        Random::seed(rand()%100);
 	double theta, phi;
 	vector3<> localX, localY, localZ, newPos;
 
