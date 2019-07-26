@@ -1,0 +1,12 @@
+nChains			20
+minDist			1.0
+maxTrials		1000
+boxSize			10,10,40
+roundRobin		no
+polymer			POLYETHYLENE
+logProgress		yes
+logSteps		no
+graftFraction	0.01
+graftedSeeds	zz
+boundary		ppf
+
