@@ -18,16 +18,18 @@ int main(int argc, char **argv)
 	InitParams ip = SARW::initialize(argc, argv, "Self Avoiding Random Walk");
 	InputMap inputMap(ip.inputFilename);
 
-	// set parameters from input file
+	// get first 3 parameters from input file
 	int nChains = inputMap.get("nChains", 1);
 	vector3<> boxSize = inputMap.getVector("boxSize", vector3<>(10,10,10));
 	double minDist = inputMap.get("minDist", 2.0);
+	// create an object from first 3 parameters
 	SARW s = SARW(nChains, boxSize, minDist);
+	// get rest of the parameters from input file
 	s.maxAtoms = inputMap.get("maxAtoms", -1);
 	s.maxTrials = inputMap.get("maxTrials", 100);
 	s.targetMassDensity = inputMap.get("targetMassDensity", 0.92);
 	s.roundRobin = inputMap.getString("roundRobin")=="yes";
-	s.polymer = inputMap.getString("polymer");
+	s.polymer = inputMap.getString("polymer", "polymer");
 	s.setLogFlags(inputMap.getString("logProgress"), inputMap.getString("logSteps"));
 	s.graftFraction = inputMap.get("graftFraction", 0.);
 	s.graftedSeeds = inputMap.getString("graftedSeeds");
