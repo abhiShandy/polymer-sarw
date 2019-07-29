@@ -74,20 +74,19 @@ class SARW
 {
 public:
 	// #### Member Variables ####
-	int nChains;
-	int maxAtoms;
-	//int minChainLength;
-	double targetMassDensity;
-	vector3<> boxSize;
 	string boundary;
-	double minDist;
-	int maxTrials;
-	bool roundRobin;
-	bool logProgress, logSteps;
+	vector3<> boxSize;
 	string graftedSeeds;
 	double graftFraction;
-	string polymer;
 	vector3<> growthBias;
+	bool logProgress, logSteps;
+	int maxAtoms;
+	int maxTrials;
+	double minDist;
+	int nChains;
+	string polymer;
+	bool roundRobin;
+	double targetMassDensity;
 
 	std::vector<Bond> listBonds;
 	std::vector<Angle> listAngles;
