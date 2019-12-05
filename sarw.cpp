@@ -29,7 +29,7 @@ int main(int argc, char **argv)
 	s.maxTrials = inputMap.get("maxTrials", 100);
 	s.targetMassDensity = inputMap.get("targetMassDensity", 0.92);
 	s.roundRobin = inputMap.getString("roundRobin")=="yes";
-	s.polymer = inputMap.getString("polymer", "polymer");
+	s.polymer = inputMap.getString("polymer");
 	s.setLogFlags(inputMap.getString("logProgress"), inputMap.getString("logSteps"));
 	s.graftFraction = inputMap.get("graftFraction", 0.);
 	s.graftedSeeds = inputMap.getString("graftedSeeds");
@@ -97,19 +97,23 @@ InitParams SARW::initialize(int argc, char** argv, const char* description)
 
 vector3<> SARW::randomUnitStep()
 {
-        Random::seed(rand()%100);
+	Random::seed(rand()%100);
+	if (growthBias == vector3<>(0,0,1))
+	{
+		vector3<> step(0,0, Random::uniformInt(2)*2-1);
+		return normalize(step);
+	}
 	vector3<> step(Random::uniform(-.5,.5), Random::uniform(-.5,.5), Random::uniform(-.5,.5));
+	return normalize(step);
 
-	if (growthBias[0]==1) step[0] = Random::uniform(0,1);
+	/*if (growthBias[0]==1) step[0] = Random::uniform(0,1);
 	else if (growthBias[0]==-1) step[0] = Random::uniform(-1,0);
 
 	if (growthBias[1]==1) step[1] = Random::uniform(0,1);
 	else if (growthBias[1]==-1) step[1] = Random::uniform(-1,0);
 
 	if (growthBias[2]==1) step[2] = Random::uniform(0,1);
-	else if (growthBias[2]==-1) step[2] = Random::uniform(-1,0);
-
-	return normalize(step);
+	else if (growthBias[2]==-1) step[2] = Random::uniform(-1,0);*/
 }
 
 /*
@@ -119,7 +123,7 @@ vector3<> SARW::randomUnitStep()
  */
 vector3<> SARW::randomConePos(const int lastIndex, const int penultimateIndex, const double distance)
 {
-        Random::seed(rand()%100);
+	Random::seed(rand()%100);
 	double theta, phi;
 	vector3<> localX, localY, localZ, newPos;
 
@@ -136,14 +140,17 @@ vector3<> SARW::randomConePos(const int lastIndex, const int penultimateIndex, c
 	while(true)
 	{
 		theta = Random::uniform(0, 359) * M_PI/180;
+		if (growthBias==vector3<>(0,0,1))
+			theta=Random::uniformInt(2)*M_PI;
 
 		newPos = distance*sin(phi)*cos(theta)*localX
 			   + distance*sin(phi)*sin(theta)*localY
 			   + distance*cos(phi)			 *localZ;
-		if (growthBias[0] && newPos[0]>0) break;
-		if (growthBias[1] && newPos[1]>0) break;
-		if (growthBias[2] && newPos[2]>0) break;
-		if (!(growthBias[0]+growthBias[1]+growthBias[2])) break;
+// 		if (growthBias[0] && newPos[0]>0) break;
+// 		if (growthBias[1] && newPos[1]>0) break;
+// 		if (growthBias[2] && newPos[2]>0) break;
+// 		if (!(growthBias[0]+growthBias[1]+growthBias[2])) break;
+		break;
 	}
 	
 	newPos += polymerChains[lastIndex].pos;
