@@ -19,45 +19,43 @@ int main(int argc, char **argv)
 	InputMap inputMap(ip.inputFilename);
 
 	// get first 3 parameters from input file
-	int nChains = inputMap.get("nChains", 1);
+	int nChains 	  = inputMap.get("nChains", 1);
 	vector3<> boxSize = inputMap.getVector("boxSize", vector3<>(10,10,10));
-	double minDist = inputMap.get("minDist", 2.0);
+	double minDist	  = inputMap.get("minDist", 2.0);
 
 	// create an object from first 3 parameters
 	SARW s = SARW(nChains, boxSize, minDist);
 
 	// get rest of the parameters from input file
-	s.maxAtoms = inputMap.get("maxAtoms", -1);
-	s.maxTrials = inputMap.get("maxTrials", 100);
 	s.targetMassDensity = inputMap.get("targetMassDensity", 0.92); // density of PE
-	s.roundRobin = inputMap.getString("roundRobin", "yes")=="yes";
-	s.polymer = inputMap.getString("polymer", "Polyethylene");
+	s.graftFraction 	= inputMap.get("graftFraction", 0.);
+	s.graftedSeeds 		= inputMap.getString("graftedSeeds", "random");
+	s.roundRobin 		= inputMap.getString("roundRobin", "yes")=="yes";
+	s.boundary 			= inputMap.getString("boundary", "ppp");
+	s.maxAtoms 			= inputMap.get("maxAtoms", -1); // estimated from targetMassDensity
+	s.maxTrials 		= inputMap.get("maxTrials", 100);
+	s.growthBias 		= inputMap.getVector("growthBias", vector3<>(0,0,0));
+	s.polymer 			= inputMap.getString("polymer", "Polyethylene");
 	s.setLogFlags(inputMap.getString("logProgress", "yes"), inputMap.getString("logSteps", "no"));
-	s.graftFraction = inputMap.get("graftFraction", 0.);
-	s.graftedSeeds = inputMap.getString("graftedSeeds", "random");
-	s.boundary = inputMap.getString("boundary", "ppp");
-	s.growthBias = inputMap.getVector("growthBias", vector3<>(0,0,0));
 	if (s.maxAtoms==-1)   s.setMaxAtoms();
 
 	logPrintf("\nINPUTS:\n");
 	logPrintf("nChains = %d\n", s.nChains);
-	logPrintf("maxAtoms = %d\n", s.maxAtoms);
 	logPrintf("boxSize = (%lg x %lg x %lg)\n", s.boxSize[0], s.boxSize[1], s.boxSize[2]);
-	logPrintf("maxTrials = %d\n", s.maxTrials);
-	logPrintf("targetMassDensity = %lg\n", s.targetMassDensity);
 	logPrintf("minDist = %lg\n", s.minDist);
-	logPrintf("polymer = %s\n", s.polymer.c_str());
-
-	logPrintf("\nFLAGS:\n");
-	logPrintf("roundRobin = %s\n", s.roundRobin?"true":"false");
-	logPrintf("logProgress = %s\n", s.logProgress?"true":"false");
-	logPrintf("logSteps = %s\n", s.logSteps?"true":"false");
-
-	logPrintf("\nCONSTRAINTS:\n");
+	logPrintf("targetMassDensity = %lg\n", s.targetMassDensity);
 	logPrintf("graftFraction = %lg\n", s.graftFraction);
 	logPrintf("graftedSeeds = %s\n", s.graftedSeeds.c_str());
-	logPrintf("growthBias = (%lg x %lg x %lg)\n", s.growthBias[0], s.growthBias[1], s.growthBias[2]);
+	logPrintf("roundRobin = %s\n", s.roundRobin?"yes":"no");
 	logPrintf("boundary = %s\n", s.boundary.c_str());
+	logPrintf("maxAtoms = %d\n", s.maxAtoms);
+	logPrintf("maxTrials = %d\n", s.maxTrials);
+	logPrintf("growthBias = (%lg x %lg x %lg)\n", s.growthBias[0], s.growthBias[1], s.growthBias[2]);
+	logPrintf("polymer = %s\n", s.polymer.c_str());
+
+	logPrintf("\nLOG FLAGS:\n");
+	logPrintf("logProgress = %s\n", s.logProgress?"yes":"no");
+	logPrintf("logSteps = %s\n", s.logSteps?"yes":"no");
 
 	int oldProgress=0, currentProgress;
 
