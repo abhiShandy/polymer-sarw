@@ -31,7 +31,7 @@ public:
 	InputMap(string filename);
 	double get(string key, double defaultVal=NAN) const;
 	vector3<> getVector(string key, vector3<> defaultVal=vector3<>(NAN)) const; //!< comma-delimited vector
-	string getString(string key) const;
+	string getString(string key, string defaultVal="") const;
 };
 
 #endif //SARW_INPUTMAP_H

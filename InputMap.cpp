@@ -74,9 +74,13 @@ vector3<> InputMap::getVector(string key, vector3<> defaultVal) const
 	return result;
 }
 
-string InputMap::getString(string key) const
+string InputMap::getString(string key, string defaultVal) const
 {	auto iter = find(key);
 	if(iter == end()) //not found
-		die("\nCould not find required entry '%s' in input.\n", key.c_str())
+	{	if(defaultVal.empty()) // no default provided
+		{	die("\nCould not find required entry '%s' in input.\n", key.c_str())
+		}
+		else return defaultVal;
+	}
 	return iter->second;
 }

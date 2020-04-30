@@ -22,19 +22,21 @@ int main(int argc, char **argv)
 	int nChains = inputMap.get("nChains", 1);
 	vector3<> boxSize = inputMap.getVector("boxSize", vector3<>(10,10,10));
 	double minDist = inputMap.get("minDist", 2.0);
+
 	// create an object from first 3 parameters
 	SARW s = SARW(nChains, boxSize, minDist);
+
 	// get rest of the parameters from input file
 	s.maxAtoms = inputMap.get("maxAtoms", -1);
 	s.maxTrials = inputMap.get("maxTrials", 100);
-	s.targetMassDensity = inputMap.get("targetMassDensity", 0.92);
-	s.roundRobin = inputMap.getString("roundRobin")=="yes";
-	s.polymer = inputMap.getString("polymer");
-	s.setLogFlags(inputMap.getString("logProgress"), inputMap.getString("logSteps"));
+	s.targetMassDensity = inputMap.get("targetMassDensity", 0.92); // density of PE
+	s.roundRobin = inputMap.getString("roundRobin", "yes")=="yes";
+	s.polymer = inputMap.getString("polymer", "Polyethylene");
+	s.setLogFlags(inputMap.getString("logProgress", "yes"), inputMap.getString("logSteps", "no"));
 	s.graftFraction = inputMap.get("graftFraction", 0.);
-	s.graftedSeeds = inputMap.getString("graftedSeeds");
+	s.graftedSeeds = inputMap.getString("graftedSeeds", "random");
+	s.boundary = inputMap.getString("boundary", "ppp");
 	s.growthBias = inputMap.getVector("growthBias", vector3<>(0,0,0));
-	s.boundary = inputMap.getString("boundary");
 	if (s.maxAtoms==-1)   s.setMaxAtoms();
 
 	logPrintf("\nINPUTS:\n");

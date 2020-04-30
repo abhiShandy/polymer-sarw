@@ -19,7 +19,7 @@ All model parameters are in the sarw.h file
 		<td>boundary</td>
 		<td>Turn off periodic boundary conditions on one of the cartesian directions (similar to LAMMPS syntax).</td>
 		<td>3 options: ppf, pfp, fpp</td>
-		<td></td>
+		<td>ppp</td>
 	</tr>
 	<tr>
 		<td>boxSize</td>
@@ -29,9 +29,9 @@ All model parameters are in the sarw.h file
 	</tr>
 	<tr>
 		<td>graftedSeeds</td>
-		<td>If the grafted seeds need to be on a specific plane, or specific coordinates, then provide the appropriate argument. Example: 'x' means seeds are placed at `x=0` plane. 'file' means seed locations should be read from 'graft.dat' in the same directory as input file. If no argument is provided, grafted seeds are randomly placed in the simulation box which should be used when no chains need to be grafted.</td>
-		<td>x, y, z, zz, file</td>
-		<td></td>
+		<td>If the grafted seeds need to be on a specific plane, or specific coordinates, then provide the appropriate argument. Example: 'x' means seeds are placed at `x=0` plane. 'file' means seed locations should be read from 'graft.dat' in the same directory as input file. By default, grafted seeds are randomly placed in the simulation box which should be used when no chains need to be grafted.</td>
+		<td>x, y, z, zz, file, random</td>
+		<td>random</td>
 	</tr>
 	<tr>
 		<td>graftFraction</td>
@@ -48,14 +48,14 @@ All model parameters are in the sarw.h file
 	<tr>
 		<td>logProgress</td>
 		<td>Whether to show overall progress of chain growth in the output file.</td>
-		<td>true/false</td>
-		<td></td>
+		<td>yes/no</td>
+		<td>yes</td>
 	</tr>
 	<tr>
 		<td>logSteps</td>
 		<td>Whether to show details about every Monte Carlo attempt, and each function call to grow the chains.</td>
-		<td>true/false</td>
-		<td></td>
+		<td>yes/no</td>
+		<td>no</td>
 	</tr>
 	<tr>
 		<td>maxAtoms</td>
