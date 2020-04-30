@@ -77,7 +77,6 @@ public:
 	string boundary;
 	vector3<> boxSize;
 	double graftFraction;
-	vector3<> growthBias;
 	bool logProgress, logSteps;
 	int maxAtoms;
 	int maxTrials;

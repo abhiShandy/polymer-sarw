@@ -33,11 +33,11 @@ int main(int argc, char **argv)
 	s.boundary 			= inputMap.getString("boundary", "ppp");
 	s.maxAtoms 			= inputMap.get("maxAtoms", -1); // estimated from targetMassDensity
 	s.maxTrials 		= inputMap.get("maxTrials", 100);
-	s.growthBias 		= inputMap.getVector("growthBias", vector3<>(0,0,0));
 	s.polymer 			= inputMap.getString("polymer", "Polyethylene");
 	s.setLogFlags(inputMap.getString("logProgress", "yes"), inputMap.getString("logSteps", "no"));
 	if (s.maxAtoms==-1)   s.setMaxAtoms();
 
+	// print all the input fields
 	logPrintf("\nINPUTS:\n");
 	logPrintf("nChains = %d\n", s.nChains);
 	logPrintf("boxSize = (%lg x %lg x %lg)\n", s.boxSize[0], s.boxSize[1], s.boxSize[2]);
@@ -48,13 +48,13 @@ int main(int argc, char **argv)
 	logPrintf("boundary = %s\n", s.boundary.c_str());
 	logPrintf("maxAtoms = %d\n", s.maxAtoms);
 	logPrintf("maxTrials = %d\n", s.maxTrials);
-	logPrintf("growthBias = (%lg x %lg x %lg)\n", s.growthBias[0], s.growthBias[1], s.growthBias[2]);
 	logPrintf("polymer = %s\n", s.polymer.c_str());
 
 	logPrintf("\nLOG FLAGS:\n");
 	logPrintf("logProgress = %s\n", s.logProgress?"yes":"no");
 	logPrintf("logSteps = %s\n", s.logSteps?"yes":"no");
 
+	// read the list of graft locations
 	if (s.graftFraction > 0) s.readGrafts("grafts.dat");
 
 	int oldProgress=0, currentProgress;
@@ -75,11 +75,11 @@ int main(int argc, char **argv)
 	s.terminateChain(); // terminate the chains by changing the type of the last unitedAtom
 	if (s.logProgress) logPrintf("\n");
 
+	s.report();
 	s.calcAnglesDihedrals();
 	s.exportLAMMPS();
 	s.exportXYZ();
 	s.exportXSF();
-	s.report();
 
 	return 0;
 }
@@ -122,22 +122,8 @@ void SARW::readGrafts(string fname)
 vector3<> SARW::randomUnitStep()
 {
 	Random::seed(rand()%100);
-	if (growthBias == vector3<>(0,0,1))
-	{
-		vector3<> step(0,0, Random::uniformInt(2)*2-1);
-		return normalize(step);
-	}
 	vector3<> step(Random::uniform(-.5,.5), Random::uniform(-.5,.5), Random::uniform(-.5,.5));
 	return normalize(step);
-
-	/*if (growthBias[0]==1) step[0] = Random::uniform(0,1);
-	else if (growthBias[0]==-1) step[0] = Random::uniform(-1,0);
-
-	if (growthBias[1]==1) step[1] = Random::uniform(0,1);
-	else if (growthBias[1]==-1) step[1] = Random::uniform(-1,0);
-
-	if (growthBias[2]==1) step[2] = Random::uniform(0,1);
-	else if (growthBias[2]==-1) step[2] = Random::uniform(-1,0);*/
 }
 
 /*
@@ -164,16 +150,9 @@ vector3<> SARW::randomConePos(const int lastIndex, const int penultimateIndex, c
 	while(true)
 	{
 		theta = Random::uniform(0, 359) * M_PI/180;
-		if (growthBias==vector3<>(0,0,1))
-			theta=Random::uniformInt(2)*M_PI;
-
 		newPos = distance*sin(phi)*cos(theta)*localX
 			   + distance*sin(phi)*sin(theta)*localY
 			   + distance*cos(phi)			 *localZ;
-// 		if (growthBias[0] && newPos[0]>0) break;
-// 		if (growthBias[1] && newPos[1]>0) break;
-// 		if (growthBias[2] && newPos[2]>0) break;
-// 		if (!(growthBias[0]+growthBias[1]+growthBias[2])) break;
 		break;
 	}
 	
