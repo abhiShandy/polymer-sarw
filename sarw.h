@@ -2,23 +2,14 @@
 #define SARW_H
 
 #define Avogadro 6.022e23
+#define BondLength 1.54
+#define AtomMass 14.0
 
 #include <core/vector3.h>
 #include <core/Util.h>
 #include <PeriodicLookup.h>
 
-/////////////////////// GLOBAL VARIABLES & STRUCTS /////////////////////
-const char species[6][10] = {"", "CH3", "CH2", "CH", "CH_aro", "C_aro"};
-
-const double bondLengths[] =
-{
-	1.54,	//CH3    - CH2      or CH2 - CH
-	1.51,	//CH     - C_aro
-	1.40	//CH_aro - CH_aro
-};
-
-const double atomMass[] = {15, 14, 13, 13, 12};
-
+// GLOBAL STRUCTS
 struct unitedAtom
 {
 	int type; //1. CH3 2. CH2 3. CH 4. Si
@@ -65,11 +56,6 @@ struct Dihedral
 	}
 };
 
-//double mass_density = 0.92; // in g/cc
-//double graftFraction = 0.20;
-//int seed_radius = 10;
-//double number_density = N_avogadro*mass_density/14.0; // units = per cc
-// int sideLength = nearbyint(pow(10,8)*pow(nUnitedAtoms/number_density, 0.3333));
 class SARW
 {
 public:
@@ -78,7 +64,6 @@ public:
 	vector3<> boxSize;
 	double graftFraction;
 	bool logProgress, logSteps;
-	int maxAtoms;
 	int maxTrials;
 	double minDist;
 	int nChains;
@@ -111,12 +96,12 @@ public:
 	int nAngles() const {return (int)listAngles.size();}
 	int nDihedrals() const {return (int)listDihedrals.size();}
 	int nGrafts() const {return (int)listGrafts.size();}
-	int targetCount() const { return nChains * maxAtoms; }
 	int actualCount() const { return polymerChains.size(); }
 	int vol() const { return boxSize[0]*boxSize[1]*boxSize[2]; }
-	double actualMassDensity()  const { return ( 14.0*actualCount()+2.0*nChains)/(Avogadro * vol() * 1e-24); }
-	double targetNumberDensity()  const { return Avogadro * targetMassDensity /14.0; }
-	double actualNumberDensity()  const { return Avogadro * actualMassDensity() /14.0; }
+	int targetCount() const { return nearbyint((vol() * targetMassDensity * Avogadro * 1e-24) / AtomMass); }
+	double actualMassDensity()  const { return AtomMass * actualCount()/(Avogadro * vol() * 1e-24); }
+	double targetNumberDensity()  const { return Avogadro * targetMassDensity / AtomMass; }
+	double actualNumberDensity()  const { return Avogadro * actualMassDensity() / AtomMass; }
 
 	// - ## export functions ##
 	void calcAnglesDihedrals();

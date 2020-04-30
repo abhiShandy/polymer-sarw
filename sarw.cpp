@@ -31,11 +31,9 @@ int main(int argc, char **argv)
 	s.graftFraction 	= inputMap.get("graftFraction", 0.);
 	s.roundRobin 		= inputMap.getString("roundRobin", "yes")=="yes";
 	s.boundary 			= inputMap.getString("boundary", "ppp");
-	s.maxAtoms 			= inputMap.get("maxAtoms", -1); // estimated from targetMassDensity
 	s.maxTrials 		= inputMap.get("maxTrials", 100);
 	s.polymer 			= inputMap.getString("polymer", "Polyethylene");
 	s.setLogFlags(inputMap.getString("logProgress", "yes"), inputMap.getString("logSteps", "no"));
-	if (s.maxAtoms==-1)   s.setMaxAtoms();
 
 	// print all the input fields
 	logPrintf("\nINPUTS:\n");
@@ -46,7 +44,6 @@ int main(int argc, char **argv)
 	logPrintf("graftFraction = %lg\n", s.graftFraction);
 	logPrintf("roundRobin = %s\n", s.roundRobin?"yes":"no");
 	logPrintf("boundary = %s\n", s.boundary.c_str());
-	logPrintf("maxAtoms = %d\n", s.maxAtoms);
 	logPrintf("maxTrials = %d\n", s.maxTrials);
 	logPrintf("polymer = %s\n", s.polymer.c_str());
 
@@ -209,7 +206,7 @@ bool SARW::propagateChain()
 		while (iTrial++ < maxTrials)
 		{
 			// avoid hard-coding any number
-			newCH2[0] = unitedAtom(2, iChain+1, randomConePos(lastIndex, penultimateIndex, bondLengths[0]));
+			newCH2[0] = unitedAtom(2, iChain+1, randomConePos(lastIndex, penultimateIndex, BondLength));
 			if (checkCollision(newCH2, lastIndex)) continue;
 			
 			addAtom(newCH2[0]);
@@ -288,7 +285,7 @@ bool SARW::randomSeed(std::vector<unitedAtom>& newChainLinks, const int iChain)
 				Random::uniform(0, boxSize[2]));
 
 		// CH atom at a random position on a sphere around the CH3 seed
-		step = bondLengths[0] * randomUnitStep();
+		step = BondLength * randomUnitStep();
 		newChainLinks[0] = (unitedAtom(1, pos0));
 		newChainLinks[1] = (unitedAtom(2, pos0 + step));
 		if (!checkCollision(newChainLinks)) break;
@@ -312,7 +309,7 @@ void SARW::exportXYZ() const
 	logPrintf("Exporting XYZ file: polymer.xyz\n");
 	FILE* fp = fopen("polymer.xyz", "w");
 	fprintf(fp, "%d\n", actualCount());
-	fprintf(fp, "POLYSTYRENE\n");
+	fprintf(fp, "Polyethylene\n");
 	for (unitedAtom atom : polymerChains)
 		fprintf(fp, "C\t%lf\t%lf\t%lf\n", atom.pos[0], atom.pos[1], atom.pos[2]);
 	fclose(fp);
@@ -391,7 +388,8 @@ void SARW::exportLAMMPS() const
 	fprintf(fp, "\n");
 
 	fprintf(fp, "Masses\n\n");
-	for (int i=0;i<2;i++) fprintf(fp, "%d\t%lf\n", i+1, atomMass[i]);
+	fprintf(fp, "%d\t%lf\n", 1, AtomMass);
+	fprintf(fp, "%d\t%lf\n", 2, AtomMass+1);
 	fprintf(fp, "\n");
 
 	fprintf(fp, "Atoms\n\n");
@@ -461,12 +459,4 @@ void SARW::setLogFlags(string logProgressFlag, string logStepsFlag)
 	logProgress = logProgressFlag=="yes";
 	logSteps = logStepsFlag=="yes";
 	if (logSteps) logProgress=true;
-}
-
-/*
-	Set the maxAtoms to the required size based on boxSize and targetMassDensity
-*/
-void SARW::setMaxAtoms()
-{
-	maxAtoms = nearbyint(((targetMassDensity * Avogadro * vol() * 1e-24) - 2.*nChains)/(14.*nChains));
 }
