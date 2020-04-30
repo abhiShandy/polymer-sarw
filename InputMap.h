@@ -17,8 +17,8 @@ You should have received a copy of the GNU General Public License
 along with JDFTx.  If not, see <http://www.gnu.org/licenses/>.
 -------------------------------------------------------------------*/
 
-#ifndef FEYNWANN_INPUTMAP_H
-#define FEYNWANN_INPUTMAP_H
+#ifndef SARW_INPUTMAP_H
+#define SARW_INPUTMAP_H
 
 #include <core/string.h>
 #include <core/vector3.h>
@@ -34,4 +34,4 @@ public:
 	string getString(string key) const;
 };
 
-#endif //FEYNWANN_INPUTMAP_H
+#endif //SARW_INPUTMAP_H
