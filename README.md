@@ -52,12 +52,6 @@ All model parameters are in the sarw.h file
 		<td>no</td>
 	</tr>
 	<tr>
-		<td>maxAtoms</td>
-		<td>Set the upper cap on number of atoms in the simulation box. If set to -1, it is fixed based on `targetDensity`</td>
-		<td>Any integer</td>
-		<td>-1</td>
-	</tr>
-	<tr>
 		<td>maxTrials</td>
 		<td>Set an upper limit on the Monte Carlo trials.</td>
 		<td>Any integer</td>
