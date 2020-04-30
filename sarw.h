@@ -76,7 +76,6 @@ public:
 	// #### Member Variables ####
 	string boundary;
 	vector3<> boxSize;
-	string graftedSeeds;
 	double graftFraction;
 	vector3<> growthBias;
 	bool logProgress, logSteps;
@@ -144,6 +143,7 @@ public:
 	vector3<> randomUnitStep();
 	vector3<> randomConePos(const int, const int, const double);
 	void setMaxAtoms();
+	void readGrafts(string fname);
 
 };
 

@@ -29,7 +29,6 @@ int main(int argc, char **argv)
 	// get rest of the parameters from input file
 	s.targetMassDensity = inputMap.get("targetMassDensity", 0.92); // density of PE
 	s.graftFraction 	= inputMap.get("graftFraction", 0.);
-	s.graftedSeeds 		= inputMap.getString("graftedSeeds", "random");
 	s.roundRobin 		= inputMap.getString("roundRobin", "yes")=="yes";
 	s.boundary 			= inputMap.getString("boundary", "ppp");
 	s.maxAtoms 			= inputMap.get("maxAtoms", -1); // estimated from targetMassDensity
@@ -45,7 +44,6 @@ int main(int argc, char **argv)
 	logPrintf("minDist = %lg\n", s.minDist);
 	logPrintf("targetMassDensity = %lg\n", s.targetMassDensity);
 	logPrintf("graftFraction = %lg\n", s.graftFraction);
-	logPrintf("graftedSeeds = %s\n", s.graftedSeeds.c_str());
 	logPrintf("roundRobin = %s\n", s.roundRobin?"yes":"no");
 	logPrintf("boundary = %s\n", s.boundary.c_str());
 	logPrintf("maxAtoms = %d\n", s.maxAtoms);
@@ -57,8 +55,9 @@ int main(int argc, char **argv)
 	logPrintf("logProgress = %s\n", s.logProgress?"yes":"no");
 	logPrintf("logSteps = %s\n", s.logSteps?"yes":"no");
 
-	int oldProgress=0, currentProgress;
+	if (s.graftFraction > 0) s.readGrafts("grafts.dat");
 
+	int oldProgress=0, currentProgress;
 	if (s.logProgress) logPrintf("\nPROGRESS: ");
 	if (s.initiateChain()) // try initiating chains, if successful move on to next step
 	{	while (s.actualCount() < s.targetCount()) // if total number of united atoms is less than the target
@@ -93,6 +92,31 @@ InitParams SARW::initialize(int argc, char** argv, const char* description)
 	ip.description = description;
 	initSystemCmdline(argc, argv, ip);
 	return ip;
+}
+
+// Read the graft locations and store them in a list
+void SARW::readGrafts(string fname)
+{
+	const char* f = fname.c_str();
+	std::ifstream graftFile(f);
+	if (graftFile.is_open())
+	{
+		logPrintf("\nReading %s:", f);
+		double x,y,z;
+		while (graftFile >> x >> y >> z) listGrafts.push_back(vector3<>(x,y,z));
+		logPrintf(" %d graft seeds found\n", nGrafts());
+		graftFile.close();
+
+		int expectedGrafts = (int) nChains * graftFraction;
+		if (nGrafts() < expectedGrafts)
+			logPrintf("Inadequate number of seeds! Expected %d seeds.\n", expectedGrafts);
+		else if (nGrafts() > expectedGrafts)
+		{
+			logPrintf("Removing extra seeds!\n");
+			while(nGrafts() > expectedGrafts) listGrafts.pop_back();
+		}
+	}
+	else logPrintf("\nFailed to open %s. Assuming no grafted chains.\n", f);
 }
 
 vector3<> SARW::randomUnitStep()
@@ -229,25 +253,10 @@ bool SARW::propagateChain()
 /*
 Try adding a pair of CH3 and CH2 to initiate a new chain
 	if successful - add the united-atoms to data-structure, and return true
-	if failed - return false, which means no more chains can be added
-Input
-	- file containing location of silica graft points (FILE FORMAT: x y z)
-
-
+	if failed - return false, which means less than desired chains could be initialized
 */
 bool SARW::initiateChain()
 {
-	// Store graft locations in matrix
-	if (graftedSeeds=="file")
-	{
-		logPrintf("Reading graft.dat\n");
-		std::ifstream graft_pos("graft.dat");
-		double x,y,z;
-		while (graft_pos >> x >> y >> z) {
-			listGrafts.push_back(vector3<>(x,y,z));
-		}
-	}
-	
 	if (logSteps) printf("Entered Initiation step\n");
 
 	std::vector<unitedAtom> newChainLinks(2, unitedAtom());
@@ -267,12 +276,12 @@ bool SARW::initiateChain()
 			// update listBond, index starts from 1
 			listBonds.push_back(Bond(1, penultimateIndices[iChain]+1, lastIndices[iChain]+1));
 			chainLengths[iChain] += 2;
-			if (logSteps) logPrintf("Initiated %dth seed\n", iChain);
+			if (logSteps) logPrintf("Initiated chain # %d\n", iChain);
 		}
 		else
 			return false;
 	}
-	if (logSteps) logPrintf("Initiated %d seeds\n", nChains);
+	if (logSteps) logPrintf("Initiated %d chains\n", nChains);
 
 	return true;
 }
@@ -281,7 +290,6 @@ bool SARW::initiateChain()
 Place randomly located seeds:
 Inputs:
 	- an empty vector of 2 unitedAtoms
-	- list of all unitedAtoms added so far
 Outputs:
 	- boolean: true if it successfully found a random location for the seed, otherwise false
 	- location of random seed in newChainLinks
@@ -295,23 +303,10 @@ bool SARW::randomSeed(std::vector<unitedAtom>& newChainLinks, const int iChain)
 		if (iChain < nGrafts()) // if atom is grafted, seed from here
 			pos0 = vector3<>(listGrafts[iChain][0], listGrafts[iChain][1], listGrafts[iChain][2]);
 		else // if atom is not grafted, seed randomly
-		{   pos0 = vector3<>(
+			pos0 = vector3<>(
 				Random::uniform(0, boxSize[0]),
 				Random::uniform(0, boxSize[1]),
 				Random::uniform(0, boxSize[2]));
-		}
-		if (iChain < nChains*graftFraction)
-		{
-			// Chains are grafted on a plane
-			if (graftedSeeds == "x") pos0[0]=0.;		// x=0
-			else if (graftedSeeds == "y") pos0[1]=0.;	// y=0
-			else if (graftedSeeds == "z") pos0[2]=0.;	// z=0
-			else if (graftedSeeds == "zz")				// z=0 & z=Lz
-			{
-				if (iChain%2) pos0[2]=0.;
-				else pos0[2] = boxSize[2]-.01;
-			}
-		}
 
 		// CH atom at a random position on a sphere around the CH3 seed
 		step = bondLengths[0] * randomUnitStep();

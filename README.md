@@ -28,14 +28,8 @@ All model parameters are in the sarw.h file
 		<td>10,10,10</td>
 	</tr>
 	<tr>
-		<td>graftedSeeds</td>
-		<td>If the grafted seeds need to be on a specific plane, or specific coordinates, then provide the appropriate argument. Example: 'x' means seeds are placed at `x=0` plane. 'file' means seed locations should be read from 'graft.dat' in the same directory as input file. By default, grafted seeds are randomly placed in the simulation box which should be used when no chains need to be grafted.</td>
-		<td>x, y, z, zz, file, random</td>
-		<td>random</td>
-	</tr>
-	<tr>
 		<td>graftFraction</td>
-		<td>Fraction of total chains which need to be grafted at locations specified by the `graftedSeeds` option.</td>
+		<td>Fraction of total chains which need to be grafted at locations listed in 'grafts.dat'</td>
 		<td>Any fraction less than 1</td>
 		<td>0.0</td>
 	</tr>
