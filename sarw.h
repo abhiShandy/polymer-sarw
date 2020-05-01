@@ -66,7 +66,7 @@ public:
     double targetMassDensity;
     int nGraftChains;
     string graftLoc;
-    bool roundRobin;
+    string growthOrder;
     string boundary;
     int maxTrials;
     string polymer;

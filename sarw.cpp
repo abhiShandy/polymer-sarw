@@ -30,7 +30,7 @@ int main(int argc, char **argv)
     s.targetMassDensity = inputMap.get("targetMassDensity", 0.92); // density of PE
     s.nGraftChains      = inputMap.get("nGraftChains", 0);
     s.graftLoc          = inputMap.getString("graftLoc", "file");
-    s.roundRobin        = inputMap.getString("roundRobin", "yes")=="yes";
+    s.growthOrder       = inputMap.getString("growthOrder", "roundRobin");
     s.boundary          = inputMap.getString("boundary", "ppp");
     s.maxTrials         = inputMap.get("maxTrials", 100);
     s.polymer           = inputMap.getString("polymer", "Polyethylene");
@@ -44,7 +44,7 @@ int main(int argc, char **argv)
     logPrintf("targetMassDensity = %lg\n", s.targetMassDensity);
     logPrintf("nGraftChains = %d\n", s.nGraftChains);
     logPrintf("graftLoc = %s\n", s.graftLoc.c_str());
-    logPrintf("roundRobin = %s\n", s.roundRobin?"yes":"no");
+    logPrintf("growthOrder = %s\n", s.growthOrder.c_str());
     logPrintf("boundary = %s\n", s.boundary.c_str());
     logPrintf("maxTrials = %d\n", s.maxTrials);
     logPrintf("polymer = %s\n", s.polymer.c_str());
@@ -197,8 +197,24 @@ bool SARW::propagateChain()
 
     for (int i = 0; i < nChains; ++i)
     {
-        if (roundRobin) iChain = i;
-        else iChain = nearbyint(Random::uniform(0, nChains-1));
+        if (growthOrder == "roundRobin")
+        {
+            iChain = i;
+        }
+        else if (growthOrder == "grafted" && nGraftChains > 0)
+        {
+            int nGraftAtoms = (nGraftChains * targetCount() / nChains) + (nChains - nGraftChains)*2;
+            if (logSteps) logPrintf("actualCount %d, nGraftAtoms %d\n", actualCount(), nGraftAtoms);
+            if (actualCount() < nGraftAtoms)
+                iChain = i % nGraftChains;
+            else
+                iChain = nGraftChains + i % (nChains - nGraftChains);
+        }
+        else
+        {
+            iChain = nearbyint(Random::uniform(0, nChains-1));
+        }
+        if (logSteps) logPrintf("propagating iChain: %d\n", iChain);
 
         lastIndex = lastIndices[iChain];
         penultimateIndex = penultimateIndices[iChain];
