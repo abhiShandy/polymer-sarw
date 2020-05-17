@@ -119,7 +119,7 @@ void SARW::readGrafts(string fname)
 
 vector3<> SARW::randomUnitStep()
 {
-    Random::seed(rand()%100);
+    Random::seed(rand());
     vector3<> step(Random::uniform(-.5,.5), Random::uniform(-.5,.5), Random::uniform(-.5,.5));
     return normalize(step);
 }
@@ -131,7 +131,7 @@ vector3<> SARW::randomUnitStep()
  */
 vector3<> SARW::randomConePos(const int lastIndex, const int penultimateIndex, const double distance)
 {
-    Random::seed(rand()%100);
+    Random::seed(rand());
     double theta, phi;
     vector3<> localX, localY, localZ, newPos;
 
@@ -190,30 +190,34 @@ bool SARW::propagateChain()
     if (logSteps) logPrintf("Entered Propagation step\n");
     // propagate all chains, if possible
     // udpate indices and lengths
-    int iChain, lastIndex, penultimateIndex;
+    int lastIndex, penultimateIndex, startChain, endChain;
     bool flag = true; // ran out of trials?
 
     std::vector<unitedAtom> newCH2(1, unitedAtom());
 
-    for (int i = 0; i < nChains; ++i)
+    if (growthOrder == "grafted" && nGraftChains > 0)
     {
-        if (growthOrder == "roundRobin")
+        int nGraftAtoms = (nGraftChains * targetCount() / nChains) + (nChains - nGraftChains)*2;
+        if (logSteps) logPrintf("actualCount %d, nGraftAtoms %d\n", actualCount(), nGraftAtoms);
+        if (actualCount() < nGraftAtoms)
         {
-            iChain = i;
-        }
-        else if (growthOrder == "grafted" && nGraftChains > 0)
-        {
-            int nGraftAtoms = (nGraftChains * targetCount() / nChains) + (nChains - nGraftChains)*2;
-            if (logSteps) logPrintf("actualCount %d, nGraftAtoms %d\n", actualCount(), nGraftAtoms);
-            if (actualCount() < nGraftAtoms)
-                iChain = i % nGraftChains;
-            else
-                iChain = nGraftChains + i % (nChains - nGraftChains);
+            startChain = 0;
+            endChain = nGraftChains;
         }
         else
         {
-            iChain = nearbyint(Random::uniform(0, nChains-1));
+            startChain = nGraftChains;
+            endChain = nChains;
         }
+    }
+    else // (growthOrder == "roundRobin")
+    {
+        startChain = 0;
+        endChain = nChains;
+    }
+
+    for (int iChain = startChain; iChain < endChain; ++iChain)
+    {
         if (logSteps) logPrintf("propagating iChain: %d\n", iChain);
 
         lastIndex = lastIndices[iChain];
@@ -238,7 +242,7 @@ bool SARW::propagateChain()
         flag = flag && (iTrial >= maxTrials); // ran out of trials
 
         if (logSteps) logPrintf("iTrial %d\n", iTrial);
-        if ((iTrial-1 < maxTrials) && logSteps) logPrintf("Propagated %dth chain at %d\n", i, actualCount());
+        if ((iTrial-1 < maxTrials) && logSteps) logPrintf("Propagated %dth chain at %d\n", iChain, actualCount());
     }
     return !flag;
 }
