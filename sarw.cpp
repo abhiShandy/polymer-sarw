@@ -413,8 +413,8 @@ void SARW::exportLAMMPS() const
     fprintf(fp, "\n");
 
     fprintf(fp, "Masses\n\n");
-    fprintf(fp, "%d\t%lf\n", 1, AtomMass);
-    fprintf(fp, "%d\t%lf\n", 2, AtomMass+1);
+    fprintf(fp, "%d\t%lf\n", 1, AtomMass+1);
+    fprintf(fp, "%d\t%lf\n", 2, AtomMass);
     fprintf(fp, "\n");
 
     fprintf(fp, "Atoms\n\n");
