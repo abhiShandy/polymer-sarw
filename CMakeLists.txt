@@ -21,7 +21,7 @@ if(GIT_FOUND)
 		OUTPUT_VARIABLE IS_GIT
 		ERROR_QUIET
 		OUTPUT_STRIP_TRAILING_WHITESPACE)
-	if("true" STREQUAL "${IS_GIT}")	
+	if("true" STREQUAL "${IS_GIT}")
 		execute_process(
 			COMMAND ${GIT_EXECUTABLE} log -1 --format=%h
 			WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -57,4 +57,3 @@ find_library(JDFTX_LIBRARY jdftx PATHS ${JDFTX_BUILD} NO_DEFAULT_PATH)
 file(GLOB sarwSources *.cpp)
 add_executable(sarw ${sarwSources})
 target_link_libraries(sarw ${JDFTX_LIBRARY})
-
