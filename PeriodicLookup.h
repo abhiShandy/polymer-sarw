@@ -12,7 +12,7 @@ class PeriodicLookup
 	vector3<int> S; //lookup mesh sample count
 	std::vector<vector3<>> points;
 	std::vector< std::vector<size_t> > indices; //list of indices into points, for each lookup mesh cell
-	
+
 	inline size_t meshIndex(vector3<int> iv) const
 	{	for(int k=0; k<3; k++) //wrap to [0,S)
 		{	if(iv[k] < 0) iv[k] += S[k];
@@ -32,7 +32,7 @@ public:
 		//Initialize indices:
 		indices.resize(S[0]*S[1]*S[2]);
 	}
-	
+
 	//! Add point updating indices
 	void addPoint(const vector3<> pos)
 	{	vector3<> v = mul(pos, boxSizeInv); //to lattice coordinates
@@ -43,8 +43,9 @@ public:
 		}
 		indices[meshIndex(iv)].push_back(points.size());
 		points.push_back(v);
+		// logPrintf("added %5.2f %5.2f %5.2f \n", v[0], v[1], v[2]);
 	}
-	
+
 	//! Return whether there are any atoms within thresh of the specified location,
 	//! optionally ignoring atom ignoreIndex if >= 0
 	bool find(vector3<> pos, int ignoreIndex=-1) const

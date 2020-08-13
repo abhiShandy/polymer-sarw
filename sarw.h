@@ -68,6 +68,7 @@ public:
 	string graftLoc;
 	string growthOrder;
 	string boundary;
+	string obstacle;
 	int maxTrials;
 	string polymer;
 	bool logProgress, logSteps;
@@ -128,7 +129,8 @@ public:
 	vector3<> randomUnitStep();
 	vector3<> randomConePos(const int, const int, const double);
 	void setMaxAtoms();
-	void readGrafts(string fname);
+	void readGrafts(string);
+	void addObstacle(string);
 
 };
 

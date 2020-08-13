@@ -35,6 +35,7 @@ int main(int argc, char **argv)
 	s.maxTrials         = inputMap.get("maxTrials", 100);
 	s.polymer           = inputMap.getString("polymer", "Polyethylene");
 	s.setLogFlags(inputMap.getString("logProgress", "yes"), inputMap.getString("logSteps", "no"));
+	s.obstacle          = inputMap.getString("obstacle", "none");
 
 	// print all the input fields
 	logPrintf("\nINPUTS:\n");
@@ -48,6 +49,7 @@ int main(int argc, char **argv)
 	logPrintf("boundary = %s\n", s.boundary.c_str());
 	logPrintf("maxTrials = %d\n", s.maxTrials);
 	logPrintf("polymer = %s\n", s.polymer.c_str());
+	logPrintf("obstacle = %s\n", s.obstacle.c_str());
 
 	logPrintf("\nLOG FLAGS:\n");
 	logPrintf("logProgress = %s\n", s.logProgress?"yes":"no");
@@ -55,6 +57,9 @@ int main(int argc, char **argv)
 
 	// read the list of graft locations
 	if (s.nGraftChains > 0 && s.graftLoc=="file") s.readGrafts("grafts.dat");
+
+	// read the list of obstacles and add it to lookup table
+	if (s.obstacle != "none") s.addObstacle(s.obstacle);
 
 	int oldProgress=0, currentProgress;
 	if (s.logProgress) logPrintf("\nPROGRESS: ");
@@ -115,6 +120,27 @@ void SARW::readGrafts(string fname)
 		}
 	}
 	else logPrintf("\nFailed to open %s. Assuming no grafted chains.\n", f);
+}
+
+// Read the list of obstacle atoms and add it to lookup table
+void SARW::addObstacle(string fname)
+{
+	const char* f = fname.c_str();
+	std::ifstream obstacleFile(f);
+	if (obstacleFile.is_open())
+	{
+		logPrintf("\nReading %s:", f);
+		double x,y,z;
+		int count = 0;
+		while (obstacleFile >> x >> y >> z){
+			vector3<> v(x,y,z);
+			// logPrintf("%5.2f %5.2f %5.2f \n", x, y, z);
+			plook.addPoint(v);
+			count++;
+		}
+		logPrintf(" %d obstacles found\n", count);
+	}
+	else logPrintf("\nFailed to open %s. Assuming no obstacles.\n", f);
 }
 
 vector3<> SARW::randomUnitStep()
