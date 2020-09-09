@@ -334,6 +334,8 @@ bool SARW::randomSeed(std::vector<unitedAtom>& newChainLinks, const int iChain)
 			pos0 = vector3<>(listGrafts[iChain][0], listGrafts[iChain][1], listGrafts[iChain][2]);
 		else if (graftLoc=="z" && iChain < nGraftChains && boundary=="ppf")
 			pos0[2] = iChain % 2 ? 0 : boxSize[2];
+		else if (graftLoc=="zCenter" && iChain < nGraftChains && boundary=="ppf")
+			pos0[2] = 0.5*boxSize[2];
 
 		// CH atom at a random position on a sphere around the CH3 seed
 		step = BondLength * randomUnitStep();
