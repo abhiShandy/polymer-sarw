@@ -191,18 +191,23 @@ Check Collision of a potential section of chain
 */
 bool SARW::checkCollision(const std::vector<unitedAtom> newChainLinks, const int ignoreIndex)
 {
-	// Check for collisions
-	for(const unitedAtom newAtom: newChainLinks)
-		if(plook.find(newAtom.pos, ignoreIndex))
-			return true;
-
-	// Fixed boundary condtions:
 	for(const unitedAtom newAtom: newChainLinks)
 	{
+		// Check for collisions with other atoms
+		if(plook.find(newAtom.pos, ignoreIndex))
+			return true;
+		// Fixed boundary condtions:
 		bool collisionFlag = ((boundary=="ppf") && ((newAtom.pos[2]<0) || (newAtom.pos[2]>boxSize[2])));
 		collisionFlag = collisionFlag || ((boundary=="pfp") && ((newAtom.pos[1]<0) || (newAtom.pos[1]>boxSize[1])));
 		collisionFlag = collisionFlag || ((boundary=="fpp") && ((newAtom.pos[0]<0) || (newAtom.pos[0]>boxSize[0])));
 		if (collisionFlag) return true;
+		// If the chains are grafted in the center, they should remain in one half
+		if (graftLoc=="zCenter" && ignoreIndex > -1)
+		{
+			double lastPos = polymerChains[ignoreIndex].pos[2] - 0.5*boxSize[2];
+			double newPos  = newAtom.pos[2] - 0.5*boxSize[2];
+			if (lastPos*newPos < 0) return true;
+		}
 	}
 	return false;
 }
