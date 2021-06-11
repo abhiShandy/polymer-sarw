@@ -259,10 +259,13 @@ bool SARW::propagateChain()
 		{
 			// avoid hard-coding any number
 			newCH2[0] = unitedAtom(2, iChain+1, randomConePos(lastIndex, penultimateIndex, BondLength));
+
+			// retry if newCH2 is colliding with existing chains
 			if (checkCollision(newCH2, lastIndex)) continue;
 
 			addAtom(newCH2[0]);
 
+			// update lists
 			penultimateIndices[iChain] = lastIndices[iChain];
 			lastIndices[iChain]        = actualCount() - 1;
 			listBonds.push_back(Bond(1, penultimateIndices[iChain] + 1, lastIndices[iChain] + 1));
@@ -357,6 +360,7 @@ void SARW::terminateChain()
 	if (logSteps) printf("Terminated!! at %d\n", actualCount());
 	for (int i = 0; i < nChains; ++i)
 	{
+		// simply change the type of molecule at the last index
 		polymerChains[lastIndices[i]].type = 1;
 		if (logSteps) printf("Terminated chain # %d\n", i+1);
 	}
