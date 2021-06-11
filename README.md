@@ -1,100 +1,49 @@
-# Overview
+# Self Avoiding Random Walk
 
-Using Self-Avoiding Random Walk (SARW) to generate polymer chains for MD simulations.
-Each monomer is modelled using united-atoms, where all hydrogens are contracted into the carbon atoms.  For example, CH3 and CH2 are modelled as a single particle of different kinds, CH3 is a particle of mass 15 a.u. and CH2 has mass of 14 a.u.
-Each subsequent united atom is placed randomly on a cone of half-angle = (180 - tetrahedral angle)=75.5 degress to capture the sp3 bond angle.
+## Overview
 
-## Description of Model Parameters
+This Self-Avoiding Random Walk (SARW) generates non-overlapping and randomly arranged polymer chains for molecular dynamic simulations.
 
-All model parameters are in the sarw.h file
+Instead of creating fully atomistic polymer chain, this method uses united atoms to model each monomer, where all hydrogens are hidden. For example, CH3 and CH2 molecules are represented by particles of mass 15 and 14 respectively. The polymer chain
 
-<table>
-	<thead>
-		<th>Parameter</th>
-		<th>Description</th>
-		<th>Possible values</th>
-		<th>Default</th>
-	</thead>
-	<tr>
-		<td>boundary</td>
-		<td>Turn off periodic boundary conditions on one of the cartesian directions (similar to LAMMPS syntax).</td>
-		<td>3 options: ppf, pfp, fpp</td>
-		<td>ppp</td>
-	</tr>
-	<tr>
-		<td>boxSize</td>
-		<td>Size of the cuboid shaped simulation box in Angstroms</td>
-		<td>Any set of 3 integers separated by commas</td>
-		<td>10,10,10</td>
-	</tr>
-	<tr>
-		<td>graftFraction</td>
-		<td>Fraction of total chains which need to be grafted at locations listed in 'grafts.dat'</td>
-		<td>Any fraction less than 1</td>
-		<td>0.0</td>
-	</tr>
-	<tr>
-		<td>growthBias</td>
-		<td>A vector used to grow the chains in specific cartesian direction.</td>
-		<td>Any set of 3 integers separated by commas. Each bias can either be 0 +1 or -1</td>
-		<td>0,0,0</td>
-	</tr>
-	<tr>
-		<td>logProgress</td>
-		<td>Whether to show overall progress of chain growth in the output file.</td>
-		<td>yes/no</td>
-		<td>yes</td>
-	</tr>
-	<tr>
-		<td>logSteps</td>
-		<td>Whether to show details about every Monte Carlo attempt, and each function call to grow the chains.</td>
-		<td>yes/no</td>
-		<td>no</td>
-	</tr>
-	<tr>
-		<td>maxTrials</td>
-		<td>Set an upper limit on the Monte Carlo trials.</td>
-		<td>Any integer</td>
-		<td>100</td>
-	</tr>
-	<tr>
-		<td>minDist</td>
-		<td>Set a minimum distance allowed between non-bonded united-atoms.</td>
-		<td>Any positive floating number</td>
-		<td>2.0</td>
-	</tr>
-	<tr>
-		<td>nChains</td>
-		<td>Set the number of chains that are grown in the simulation box. Some of them maybe grafted if `graftFraction` is non-zero.</td>
-		<td>Any integer</td>
-		<td>1</td>
-	</tr>
-	<tr>
-		<td>polymer</td>
-		<td>Name of the polymer used in the header of LAMMPS data file</td>
-		<td>Any string</td>
-		<td>polymer</td>
-	</tr>
-	<tr>
-		<td>roundRobin</td>
-		<td>Whether the chains should be grown in round-robin fashion or randomly</td>
-		<td>yes/no</td>
-		<td>yes</td>
-	</tr>
-	<tr>
-		<td>targetMassDensity</td>
-		<td>Set the mass density of simulation box in gram per cubic centimeter</td>
-		<td>Any positive fraction</td>
-		<td>0.92</td>
-	</tr>
+This method creates a chain of particles at a fixed distance equal to the carbon-carbon bond length of the polymer being represented, and at a fixed carbon-carbon-carbon bond angle. The orientation of the bond angle is randomly determined.
 
-</table>
+The method is implemented in C++ and is contained in the following files:
+- `sarw.cpp`: the main file with all key subroutines to create the polymer chains
+- `sarw.h`: the header file for the above with definitions for key variables and data structures
+- `InputMap.cpp`: program to handle the input file with user-defined variables
+- `InputMap.h`: header file for the above
+- `PeriodicLookup.h`: creates a lookup table for finding potential overlapping particles. This is responsible for significant speedup.
+
+## How to run
+
+- list all the necessary user-defined variables and their desired values in an ASCII. Eg, `pe.in`
+- build the `sarw` binary using CMake
+- Use the binary and input file to create polymer chains. Eg, `sarw -i pe.in`
+
+## Description of user-defined variables
+
+<!-- All model parameters are defined in the sarw.h file -->
+
+|Parameter | Description | Possible values | Default |
+|---|---|---|---|
+|`boundary`|Turn off periodic boundary conditions on one of the cartesian directions (similar to LAMMPS syntax).|3 options: ppf, pfp, fpp|ppp|
+|`boxSize`|Size of the cuboid shaped simulation box in Angstroms|Any set of 3 integers separated by commas|10,10,10|
+|`graftFraction`|Fraction of total chains which need to be grafted at locations listed in 'grafts.dat'|Any fraction less than 1|0.0|
+|`growthBias`|A vector used to grow the chains in specific cartesian direction.|Any set of 3 integers separated by commas. Each bias can either be 0 +1 or -1|0,0,0|
+|`logProgress`|Whether to show overall progress of chain growth in the output file.|yes/no|yes|
+|`logSteps`|Whether to show details about every Monte Carlo attempt, and each function call to grow the chains.|yes/no|no|
+|`maxTrials`|Set an upper limit on the Monte Carlo trials.|Any integer|100|
+|`minDist`|Set a minimum distance allowed between non-bonded united-atoms.|Any positive floating number|2.0|
+|`nChains`|Set the number of chains that are grown in the simulation box. Some of them maybe grafted if `graftFraction` is non-zero.|Any integer|1|
+|`polymer`|Name of the polymer used in the header of LAMMPS data file|Any string|polymer|
+|`roundRobin`|Whether the chains should be grown in round-robin fashion or randomly|yes/no|yes|
+|`targetMassDensity`|Set the mass density of simulation box in gram per cubic centimeter|Any positive fraction|0.92|
 
 ## Outputs
-main.log	- same output as that on the terminal while running the CPP program
-polymer.XYZ 	- type and cartesian coordinates of all particles, can be opened in Ovito and XMD
-polymer.XSF	- box size, and coordinates of all particles, particles are not distinguishable as Carbon is used to represent both the types, can be opened in VESTA
-polymer.data	- data file in the prescribed LAMMPS format, can be read in using 'read_data' command in LAMMPS,
+- `polymer.XYZ`: type and cartesian coordinates of all particles, can be opened in Ovito and XMD
+- `polymer.XSF`: box size, and coordinates of all particles, particles are not distinguishable as Carbon is used to represent both the types, can be opened in VESTA
+- `polymer.data`: data file in the prescribed LAMMPS format, can be read in using 'read_data' command in LAMMPS,
 
 ## TODO
 
