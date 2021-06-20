@@ -72,6 +72,7 @@ public:
 	int maxTrials;
 	string polymer;
 	bool logProgress, logSteps;
+	int nObstacles;
 
 	std::vector<Bond> listBonds;
 	std::vector<Angle> listAngles;

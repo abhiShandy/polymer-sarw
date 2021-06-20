@@ -139,6 +139,7 @@ void SARW::addObstacle(string fname)
 			count++;
 		}
 		logPrintf(" %d obstacles found\n", count);
+		nObstacles = count;
 	}
 	else logPrintf("\nFailed to open %s. Assuming no obstacles.\n", f);
 }
@@ -194,7 +195,7 @@ bool SARW::checkCollision(const std::vector<unitedAtom> newChainLinks, const int
 	for(const unitedAtom newAtom: newChainLinks)
 	{
 		// Check for collisions with other atoms
-		if(plook.find(newAtom.pos, ignoreIndex))
+		if(plook.find(newAtom.pos, ignoreIndex + nObstacles))
 			return true;
 		// Fixed boundary condtions:
 		bool collisionFlag = ((boundary=="ppf") && ((newAtom.pos[2]<0) || (newAtom.pos[2]>boxSize[2])));
